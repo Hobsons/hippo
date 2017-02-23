@@ -1,54 +1,45 @@
 import uuid
 import logging
-from addict import Dict
 from pymesos import Scheduler, encode_data
 from tasks import HippoTask
 
-TASK_CPU = 0.1
-TASK_MEM = 32
-EXECUTOR_CPUS = 0.1
-EXECUTOR_MEM = 32
 
 class HippoScheduler(Scheduler):
-
     def __init__(self, redis_client):
         self.redis = redis_client
     
     def resourceOffers(self, driver, offers):
         filters = {'refuse_seconds': 5}
 
-        mesos_launch_tasks = []
+        working_tasks = HippoTask.working_tasks(self.redis)
+
+        working_count_by_id = {}
+        for t in working_tasks:
+            working_count_by_id.setdefault(t.definition_id(),0)
+            working_count_by_id[t.definition_id()] += 1
+
         waiting_tasks = HippoTask.waiting_tasks(self.redis)
+        waiting_tasks.reverse()
+
+        waiting_tasks = [t for t in waiting_tasks if t.max_concurrent() > working_count_by_id.get(t.definition_id(),0)]
 
         for offer in offers:
             logging.debug('Offer',offer)
-            cpus = self.getResource(offer.resources, 'cpus')
-            mem = self.getResource(offer.resources, 'mem')
-            if cpus < TASK_CPU or mem < TASK_MEM:
-                continue
+            cpus_available = self.getResource(offer.resources, 'cpus')
+            mem_available = self.getResource(offer.resources, 'mem')
 
-            task = Dict()
-            task_id = str(uuid.uuid4())
-            task.task_id.value = task_id
-            task.agent_id.value = offer.agent_id.value
-            task.name = 'task {}'.format(task_id)
-            #task.executor = self.executor
-            task.command.value = "echo facemar && ls -l /mnt/tmp"
-            task.command.
-            task.container.type='DOCKER'
-            task.container.docker.image='busybox:latest'
-            task.container.volumes = [
-                dict(mode='RW',container_path='/mnt/tmp',host_path='/Users/mdemaray/java'),
-            ]
-            task.data = encode_data('Hello from task {}!'.format(task_id))
+            matched_tasks = []
+            for task in waiting_tasks:
+                if (task.cpus() <= cpus_available and
+                   task.mem() <= mem_available and
+                   working_count_by_id.get(task.definition_id(),0) < task.max_concurrent() and
+                   task.constraints_ok(offer)):
 
-            task.resources = [
-                dict(name='cpus', type='SCALAR', scalar={'value': TASK_CPU}),
-                dict(name='mem', type='SCALAR', scalar={'value': TASK_MEM}),
-            ]
+                    matched_tasks.append(task.mesos_launch_definition(offer))
+                    task.work()
+                    working_count_by_id[task.definition_id()] += 1
 
-            driver.launchTasks(offer.id, [task], filters)
-
+            driver.launchTasks(offer.id, matched_tasks, filters)
 
     def getResource(self, res, name):
         for r in res:
@@ -57,6 +48,12 @@ class HippoScheduler(Scheduler):
         return 0.0
 
     def statusUpdate(self, driver, update):
+        t = HippoTask(mesos_id=update.task_id.value,redis_client=self.redis)
+        t.definition['mesos_status'] = update.state
+        t.save()
+        if update.state in ['TASK_FINISHED','TASK_FAILED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
+                            'TASK_KILLED','TASK_UNREACHABLE','TASK_GONE','TASK_GONE_BY_OPERATOR']:
+            t.finish()
         logging.debug('Status update TID %s %s',
                       update.task_id.value,
                       update.state)

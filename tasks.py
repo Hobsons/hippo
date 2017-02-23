@@ -1,47 +1,87 @@
 import json
 import uuid
+from addict import Dict
 from cerberus import Validator
 
 
 class HippoTask(object):
-    def __init__(self, id=None, definition=None, redis_client=None):
-        self.id = id
+    def __init__(self, mesos_id=None, definition=None, redis_client=None):
+        self.mesos_id = mesos_id
         self.definition = definition
         self.redis = redis_client
-        if id is None:
-            self.id = self.definition.get('mesos_id','hippo') + '.' + str(uuid.uuid4())
+        if mesos_id is None:
+            self.mesos_id = self.definition.get('mesos_id','hippo') + '.' + str(uuid.uuid4())
         elif definition is None:
             self.load()
-        self.definition['mesos_id'] = self.id
+        self.definition['mesos_id'] = self.mesos_id
+
+    @classmethod
+    def tasks_from_ids(cls, task_ids, redis_client):
+        if not task_ids:
+            return []
+        pipe = redis_client.pipeline()
+        for tid in task_ids:
+            pipe.get(tid)
+        results = pipe.execute()
+        result_objects = []
+        for tstr in results:
+            if tstr:
+                result_objects.append(cls(definition=json.loads(tstr),redis_client=redis_client))
+        return result_objects
 
     @classmethod
     def all_tasks(cls, redis_client):
-        task_ids = redis_client.zrange('hippo:all_taskid_list',0,-1)
-        if not task_ids:
-            task_ids = []
-        return [cls(id=tid,redis_client=redis_client) for tid in task_ids]
+        return cls.tasks_from_ids(redis_client.zrange('hippo:all_taskid_list',0,-1), redis_client)
 
     @classmethod
     def waiting_tasks(cls, redis_client):
-        task_ids = redis_client.lrange('hippo:waiting_taskid_list',0,-1)
-        return [cls(id=tid,redis_client=redis_client) for tid in task_ids]
+        return cls.tasks_from_ids(redis_client.lrange('hippo:waiting_taskid_list',0,-1), redis_client)
+
+    @classmethod
+    def working_tasks(cls, redis_client):
+        return cls.tasks_from_ids(redis_client.lrange('hippo:working_taskid_list',0,-1), redis_client)
 
     def delete(self):
-        self.redis.lrem('hippo:waiting_taskid_list',self.id)
-        self.redis.zrem('hippo:all_taskid_list',self.id)
+        pipe = self.redis.pipeline()
+        pipe.lrem('hippo:waiting_taskid_list',self.mesos_id)
+        pipe.lrem('hippo:working_taskid_list',self.mesos_id)
+        pipe.zrem('hippo:all_taskid_list',self.mesos_id)
+        pipe.rem(self.mesos_id)
+        pipe.execute()
 
     def load(self):
-        body = self.redis.get(self.id)
+        body = self.redis.get(self.mesos_id)
         if not body:
             self.definition = {}
         else:
             self.definition = json.loads(body)
 
     def save(self):
-        self.redis.set(self.id,json.dumps(self.definition))
+        self.redis.set(self.mesos_id,json.dumps(self.definition))
+
+    def queue(self):
+        self.redis.lpush('hippo:waiting_taskid_list',self.mesos_id)
 
     def work(self):
-        self.redis.lpush('hippo:waiting_taskid_list',self.id)
+        pipe = self.redis.pipeline()
+        pipe.lpush('hippo:working_taskid_list',self.mesos_id)
+        pipe.lrem('hippo:waiting_taskid_list',self.mesos_id)
+        pipe.execute()
+
+    def finish(self):
+        self.redis.lrem('hippo:working_taskid_list',self.mesos_id)
+
+    def definition_id(self):
+        return self.definition.get('id','')
+
+    def cpus(self):
+        return self.definition.get('cpus',0.1)
+
+    def mem(self):
+        return self.definition.get('mem',256)
+
+    def max_concurrent(self):
+        return self.definition.get('max_concurrent',10000)
 
     def validate(self):
         v = Validator(TASK_SCHEMA, allow_unknown=True)
@@ -49,6 +89,28 @@ class HippoTask(object):
         if valid:
             return None
         return str(v.errors)
+
+    def mesos_launch_definition(self, offer):
+        d = Dict()
+        d.task_id.value = self.mesos_id
+        d.agent_id.value = offer.agent_id.value
+        d.name = self.definition_id()
+        d.command.value = self.definition['cmd']
+        if self.definition.get('env'):
+            d.command.environment.variables = [
+                dict(name=e[1],value=e[2]) for e in self.definition['env'].items()
+            ]
+        d.container.type='DOCKER'
+        d.container.docker.image=self.definition['container']['docker']['image']
+        d.resources = [
+            dict(name='cpus', type='SCALAR', scalar={'value': self.cpus()}),
+            dict(name='mem', type='SCALAR', scalar={'value': self.mem()}),
+        ]
+        if self.definition['container'].get('volumes'):
+            d.container.volumes = [
+                dict(mode=v['mode'],container_path=v['containerPath'],host_path=v['hostPath']) for v in self.definition['container']['volumes']
+            ]
+        return d
 
 
 TASK_SCHEMA = {
@@ -124,7 +186,13 @@ TASK_SCHEMA = {
         "schema": {
             "type":"list"
         }
-    }
+    },
+    "max_concurrent": {
+        "type":"integer",
+        "min":0,
+        "max":64000,
+    },
+
 }
 
 

@@ -1,20 +1,11 @@
 import os
 import redis
+import config
 from flask import Flask, request, jsonify, render_template
 from tasks import HippoTask
 
-REDIS_HOST = os.getenv('REDIS_HOST')
-if ':' in REDIS_HOST:
-    REDIS_HOST, REDIS_PORT = REDIS_HOST.split(':')
-else:
-    REDIS_PORT = int(os.getenv('REDIS_PORT',6379))
-REDIS_DB = int(os.getenv('REDIS_DB',0))
-REDIS_PW = os.getenv('REDIS_PW')
-
-
 app = Flask(__name__)
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.redis = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, password=REDIS_PW)
+app.redis = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB, password=config.REDIS_PW)
 
 
 @app.route('/tasks/',methods=['GET','POST'])
@@ -27,8 +18,8 @@ def tasks():
         if validation_error:
             return jsonify({"error":validation_error})
         t.save()
-        t.work()
-        return jsonify({"mesos_id",t.id})
+        t.queue()
+        return jsonify({"mesos_id",t.mesos_id})
     else:
         tasks = HippoTask.all_tasks(redis_client=app.redis)
 
@@ -38,11 +29,11 @@ def tasks():
 @app.route('/tasks/<task_id>/',methods=['GET','DELETE'])
 def single_task(task_id):
     if request.method == 'DELETE':
-        t = HippoTask(id=task_id,redis_client=app.redis)
+        t = HippoTask(mesos_id=task_id,redis_client=app.redis)
         t.delete()
         return jsonify({"deleted": task_id})
     else:
-        t = HippoTask(id=task_id,redis_client=app.redis)
+        t = HippoTask(mesos_id=task_id,redis_client=app.redis)
         return jsonify(t.definition)
 
 

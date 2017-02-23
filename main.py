@@ -1,19 +1,23 @@
 import os
-import sys
 import time
+import config
+import redis
 import socket
 import signal
 import logging
 from threading import Thread
-from os.path import abspath, join, dirname
 from addict import Dict
 from scheduler import HippoScheduler
+from tasks import HippoTask
 from pymesos import MesosSchedulerDriver
+from kazoo.client import KazooClient
+from kazoo.recipe.election import Election
 
 
+def leader():
+    logging.debug('Elected as leader, starting work...')
 
-
-def main(master):
+    redis_client = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB, password=config.REDIS_PW)
 
     framework = Dict()
     framework.user = 'root'
@@ -21,14 +25,14 @@ def main(master):
     framework.hostname = os.getenv('HOST',socket.gethostname())
 
     driver = MesosSchedulerDriver(
-        HippoScheduler(),
+        HippoScheduler(redis_client),
         framework,
-        master,
+        config.ZK_URI,
         use_addict=True,
     )
 
     def signal_handler(signal, frame):
-        driver.stop()
+        driver.stop(failover=True)
 
     def run_driver_thread():
         driver.run()
@@ -36,18 +40,39 @@ def main(master):
     driver_thread = Thread(target=run_driver_thread, args=())
     driver_thread.start()
 
-    print('Scheduler running, Ctrl+C to quit.')
     signal.signal(signal.SIGINT, signal_handler)
+
+    running_task_ids = [dict(task_id=t.id() for t in HippoTask.working_tasks(redis_client=redis_client))]
+    if running_task_ids:
+        logging.debug('Reconciling %d tasks' % len(running_task_ids))
+        driver.reconcileTasks(running_task_ids)
 
     while driver_thread.is_alive():
         time.sleep(1)
 
+    logging.debug('...Exiting')
+
 
 if __name__ == '__main__':
+
     logging.basicConfig(level=logging.DEBUG)
 
-    if len(sys.argv) != 2:
-        print("Usage: {} <mesos_master>".format(sys.argv[0]))
-        sys.exit(1)
-    else:
-        main(sys.argv[1])
+    incomplete_config = False
+    if not config.REDIS_HOST:
+        incomplete_config = True
+        logging.error("Redis host must be present in REDIS_HOST variable")
+
+    if not config.ZK_URI:
+        incomplete_config = True
+        logging.error("Zookeeper uri must be present in ZK_URI variable")
+
+    if not incomplete_config:
+        zk = KazooClient(hosts='127.0.0.1:2181')
+        zk.start()
+
+        hostname = os.getenv('HOST',socket.gethostname())
+
+        leader_election = Election(zk,'hippoleader',hostname)
+        logging.debug('Contending to be the hippo leader...')
+        logging.debug('contenders:',leader_election.contenders())
+        leader_election.run(leader)
