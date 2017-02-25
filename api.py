@@ -19,11 +19,11 @@ def tasks():
             return jsonify({"error":validation_error})
         t.save()
         t.queue()
-        return jsonify({"mesos_id",t.mesos_id})
+        return jsonify({"mesos_id":t.mesos_id})
     else:
         tasks = HippoTask.all_tasks(redis_client=app.redis)
 
-    return jsonify(tasks)
+    return jsonify([t.definition for t in tasks])
 
 
 @app.route('/tasks/<task_id>/',methods=['GET','DELETE'])

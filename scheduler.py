@@ -24,7 +24,7 @@ class HippoScheduler(Scheduler):
         waiting_tasks = [t for t in waiting_tasks if t.max_concurrent() > working_count_by_id.get(t.definition_id(),0)]
 
         for offer in offers:
-            logging.debug('Offer',offer)
+            logging.debug('Offer: ' + str(offer))
             cpus_available = self.getResource(offer.resources, 'cpus')
             mem_available = self.getResource(offer.resources, 'mem')
 
@@ -37,7 +37,10 @@ class HippoScheduler(Scheduler):
 
                     matched_tasks.append(task.mesos_launch_definition(offer))
                     task.work()
+                    working_count_by_id.setdefault(task.definition_id(),0)
                     working_count_by_id[task.definition_id()] += 1
+                    cpus_available -= task.cpus()
+                    mem_available -= task.mem()
 
             driver.launchTasks(offer.id, matched_tasks, filters)
 
@@ -57,3 +60,4 @@ class HippoScheduler(Scheduler):
         logging.debug('Status update TID %s %s',
                       update.task_id.value,
                       update.state)
+        logging.debug(str(update))

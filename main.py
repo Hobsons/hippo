@@ -27,7 +27,7 @@ def leader():
     driver = MesosSchedulerDriver(
         HippoScheduler(redis_client),
         framework,
-        config.ZK_URI,
+        config.MESOS_HOST if config.MESOS_HOST else config.ZK_URI,
         use_addict=True,
     )
 
@@ -42,7 +42,7 @@ def leader():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    running_task_ids = [dict(task_id=t.id() for t in HippoTask.working_tasks(redis_client=redis_client))]
+    running_task_ids = [dict(task_id=t.id()) for t in HippoTask.working_tasks(redis_client=redis_client)]
     if running_task_ids:
         logging.debug('Reconciling %d tasks' % len(running_task_ids))
         driver.reconcileTasks(running_task_ids)
@@ -55,7 +55,7 @@ def leader():
 
 if __name__ == '__main__':
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
     incomplete_config = False
     if not config.REDIS_HOST:
@@ -67,12 +67,12 @@ if __name__ == '__main__':
         logging.error("Zookeeper uri must be present in ZK_URI variable")
 
     if not incomplete_config:
-        zk = KazooClient(hosts='127.0.0.1:2181')
+        zk = KazooClient(hosts=config.ZK_URI.replace('zk://','').replace('/mesos',''))
         zk.start()
 
         hostname = os.getenv('HOST',socket.gethostname())
 
         leader_election = Election(zk,'hippoleader',hostname)
         logging.debug('Contending to be the hippo leader...')
-        logging.debug('contenders:',leader_election.contenders())
+        logging.debug('contenders: ' + str(leader_election.contenders()))
         leader_election.run(leader)

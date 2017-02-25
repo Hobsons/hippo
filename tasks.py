@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from addict import Dict
 from cerberus import Validator
@@ -9,11 +10,17 @@ class HippoTask(object):
         self.mesos_id = mesos_id
         self.definition = definition
         self.redis = redis_client
-        if mesos_id is None:
-            self.mesos_id = self.definition.get('mesos_id','hippo') + '.' + str(uuid.uuid4())
-        elif definition is None:
+
+        if not definition:
             self.load()
-        self.definition['mesos_id'] = self.mesos_id
+
+        if mesos_id is None:
+            if 'mesos_id' in definition:
+                self.mesos_id = definition['mesos_id']
+            else:
+                self.mesos_id = self.definition.get('id','hippo') + '.' + str(uuid.uuid4())
+                self.definition['mesos_id'] = self.mesos_id
+                self.save()
 
     @classmethod
     def tasks_from_ids(cls, task_ids, redis_client):
@@ -43,8 +50,8 @@ class HippoTask(object):
 
     def delete(self):
         pipe = self.redis.pipeline()
-        pipe.lrem('hippo:waiting_taskid_list',self.mesos_id)
-        pipe.lrem('hippo:working_taskid_list',self.mesos_id)
+        pipe.lrem('hippo:waiting_taskid_list',0,self.mesos_id)
+        pipe.lrem('hippo:working_taskid_list',0,self.mesos_id)
         pipe.zrem('hippo:all_taskid_list',self.mesos_id)
         pipe.rem(self.mesos_id)
         pipe.execute()
@@ -61,15 +68,16 @@ class HippoTask(object):
 
     def queue(self):
         self.redis.lpush('hippo:waiting_taskid_list',self.mesos_id)
+        self.redis.zadd('hippo:all_taskid_list',int(time.time()),self.mesos_id)
 
     def work(self):
         pipe = self.redis.pipeline()
         pipe.lpush('hippo:working_taskid_list',self.mesos_id)
-        pipe.lrem('hippo:waiting_taskid_list',self.mesos_id)
+        pipe.lrem('hippo:waiting_taskid_list',0,self.mesos_id)
         pipe.execute()
 
     def finish(self):
-        self.redis.lrem('hippo:working_taskid_list',self.mesos_id)
+        self.redis.lrem('hippo:working_taskid_list',0,self.mesos_id)
 
     def definition_id(self):
         return self.definition.get('id','')
@@ -82,6 +90,9 @@ class HippoTask(object):
 
     def max_concurrent(self):
         return self.definition.get('max_concurrent',10000)
+
+    def constraints_ok(self,offer):
+        return True
 
     def validate(self):
         v = Validator(TASK_SCHEMA, allow_unknown=True)

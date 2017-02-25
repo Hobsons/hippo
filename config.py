@@ -11,3 +11,4 @@ REDIS_PW = os.getenv('REDIS_PW')
 
 ZK_URI = os.getenv('ZK_URI')
 
+MESOS_HOST = os.getenv('MESOS_HOST')
