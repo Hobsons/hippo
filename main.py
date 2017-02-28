@@ -9,9 +9,24 @@ from threading import Thread
 from addict import Dict
 from scheduler import HippoScheduler
 from tasks import HippoTask
+from queues import HippoQueue
 from pymesos import MesosSchedulerDriver
 from kazoo.client import KazooClient
 from kazoo.recipe.election import Election
+
+
+def reconcile(driver, redis_client):
+    # reconcile tasks every 15 minutes
+    def _rcile():
+        while True:
+            running_task_ids = [dict(task_id=t.id()) for t in HippoTask.working_tasks(redis_client=redis_client)]
+            if running_task_ids:
+                logging.info('Reconciling %d tasks' % len(running_task_ids))
+                driver.reconcileTasks(running_task_ids)
+            time.sleep(60 * 15)
+    t = Thread(target=_rcile,args=(),daemon=True)
+    t.start()
+    return t
 
 
 def leader():
@@ -42,10 +57,12 @@ def leader():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    running_task_ids = [dict(task_id=t.id()) for t in HippoTask.working_tasks(redis_client=redis_client)]
-    if running_task_ids:
-        logging.debug('Reconciling %d tasks' % len(running_task_ids))
-        driver.reconcileTasks(running_task_ids)
+    # reconcile will run every 15 minutes in it's own thread
+    reconcile(driver, redis_client)
+
+    # hippo queue will run a thread pool to monitor queues for work and create tasks
+    HippoQueue.process_queues(redis_client)
+
 
     while driver_thread.is_alive():
         time.sleep(1)

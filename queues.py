@@ -1,7 +1,13 @@
 import json
 import uuid
+import time
+import config
+from threading import Thread
+from queue import Queue
 from cerberus import Validator
 from tasks import TASK_SCHEMA
+from data_sources import *
+
 
 class HippoQueue(object):
     def __init__(self, id=None, definition=None, redis_client=None):
@@ -10,6 +16,7 @@ class HippoQueue(object):
         self.redis = redis_client
         if id is None:
             self.id = self.definition.get('id','hippo-queue') + '.' + str(uuid.uuid4())
+            self.save()
         elif definition is None:
             self.load()
 
@@ -33,7 +40,41 @@ class HippoQueue(object):
 
     @classmethod
     def process_queues(cls, redis_client):
-        queue_ids = []
+
+        def worker():
+            while True:
+                hq = q.get()
+                hq.process_data()
+                q.task_done()
+
+        q = Queue()
+        for i in range(config.NUM_QUEUE_POLL_WORKERS):
+             t = Thread(target=worker)
+             t.daemon = True
+             t.start()
+
+        def feed_work():
+            while True:
+                hippo_queues = HippoQueue.all_queues(redis_client)
+                if q.qsize() < len(hippo_queues) * 2:
+                    for hippo_q in hippo_queues:
+                        q.put(hippo_q)
+                time.sleep(1)
+
+        Thread(target=feed_work,daemon=True)
+
+    def process_data(self):
+        qtype = self.definition['queue']['type']
+        processors = HippoDataSource.__subclasses__()
+        for p in processors:
+            if p.__name__.upper() == qtype.upper():
+                dp = p(self)
+                if not dp.too_soon():
+                    dp.create_tasks()
+                break
+
+    def save(self):
+        self.redis.set('hippo:queue:' + self.id,json.dumps(self.definition))
 
     def load(self):
         body = self.redis.get('hippo:queue:' + self.id)

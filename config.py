@@ -12,3 +12,5 @@ REDIS_PW = os.getenv('REDIS_PW')
 ZK_URI = os.getenv('ZK_URI')
 
 MESOS_HOST = os.getenv('MESOS_HOST')
+
+NUM_QUEUE_POLL_WORKERS = int(os.getenv('NUM_QUEUE_POLL_WORKERS',8))

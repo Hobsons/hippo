@@ -14,9 +14,9 @@ def tasks():
         data = request.get_json()
         # create a new task
         t = HippoTask(definition=data,redis_client=app.redis)
-        validation_error =  t.validate()
+        validation_error = t.validate()
         if validation_error:
-            return jsonify({"error":validation_error})
+            return jsonify({"error":validation_error}), 400
         t.save()
         t.queue()
         return jsonify({"mesos_id":t.mesos_id})
