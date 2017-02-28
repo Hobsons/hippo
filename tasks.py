@@ -14,6 +14,12 @@ class HippoTask(object):
         if not definition:
             self.load()
 
+        if 'task_retries' not in definition:
+            self.definition['task_retries'] = 0
+
+        if 'system_retries' not in definition:
+            self.definition['system_retries'] = 2
+
         if mesos_id is None:
             if 'mesos_id' in definition:
                 self.mesos_id = definition['mesos_id']
@@ -48,6 +54,15 @@ class HippoTask(object):
     def working_tasks(cls, redis_client):
         return cls.tasks_from_ids(redis_client.lrange('hippo:working_taskid_list',0,-1), redis_client)
 
+    @classmethod
+    def working_task_count_by_id(cls, redis_client):
+        working_tasks = cls.working_tasks(redis_client)
+        working_count_by_id = {}
+        for t in working_tasks:
+            working_count_by_id.setdefault(t.definition_id(),0)
+            working_count_by_id[t.definition_id()] += 1
+        return working_count_by_id
+
     def delete(self):
         pipe = self.redis.pipeline()
         pipe.lrem('hippo:waiting_taskid_list',0,self.mesos_id)
@@ -78,6 +93,9 @@ class HippoTask(object):
 
     def finish(self):
         self.redis.lrem('hippo:working_taskid_list',0,self.mesos_id)
+
+    def retry(self):
+        pass
 
     def definition_id(self):
         return self.definition.get('id','')
@@ -187,10 +205,7 @@ TASK_SCHEMA = {
         "required":True
     },
     "env": {
-        "type":"list",
-        "schema":{
-            "type":"dict"
-        }
+        "type":"dict"
     },
     "constraints": {
         "type":"list",
@@ -203,7 +218,16 @@ TASK_SCHEMA = {
         "min":0,
         "max":64000,
     },
-
+    "task_retries": {
+        "type":"integer",
+        "min":0,
+        "max":100
+    },
+    "system_retries": {
+        "type":"integer",
+        "min":0,
+        "max":100
+    }
 }
 
 

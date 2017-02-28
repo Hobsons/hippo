@@ -17,7 +17,6 @@ def tasks():
         validation_error = t.validate()
         if validation_error:
             return jsonify({"error":validation_error}), 400
-        t.save()
         t.queue()
         return jsonify({"mesos_id":t.mesos_id})
     else:
@@ -28,8 +27,10 @@ def tasks():
 
 @app.route('/tasks/<task_id>/',methods=['GET','DELETE'])
 def single_task(task_id):
+    t = HippoTask(mesos_id=task_id,redis_client=app.redis)
+
+
     if request.method == 'DELETE':
-        t = HippoTask(mesos_id=task_id,redis_client=app.redis)
         t.delete()
         return jsonify({"deleted": task_id})
     else:
@@ -39,8 +40,8 @@ def single_task(task_id):
 
 @app.route('/tasks/<task_id>/kill/',methods=['GET','POST'])
 def kill_task(task_id):
-    r = app.redis
-    r.get('')
+    t = HippoTask(mesos_id=task_id,redis_client=app.redis)
+    if
     return jsonify({"status": "ACTIVE"})
 
 

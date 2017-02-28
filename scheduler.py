@@ -11,12 +11,7 @@ class HippoScheduler(Scheduler):
     def resourceOffers(self, driver, offers):
         filters = {'refuse_seconds': 5}
 
-        working_tasks = HippoTask.working_tasks(self.redis)
-
-        working_count_by_id = {}
-        for t in working_tasks:
-            working_count_by_id.setdefault(t.definition_id(),0)
-            working_count_by_id[t.definition_id()] += 1
+        working_count_by_id = HippoTask.working_task_count_by_id(self.redis)
 
         waiting_tasks = HippoTask.waiting_tasks(self.redis)
         waiting_tasks.reverse()
