@@ -2,6 +2,8 @@ import copy
 import json
 import time
 import uuid
+import logging
+import config
 from addict import Dict
 from cerberus import Validator
 
@@ -15,15 +17,15 @@ class HippoTask(object):
         if not definition:
             self.load()
 
-        if 'task_retries' not in definition:
+        if 'task_retries' not in self.definition:
             self.definition['task_retries'] = 0
 
-        if 'system_retries' not in definition:
+        if 'system_retries' not in self.definition:
             self.definition['system_retries'] = 2
 
         if mesos_id is None:
-            if 'mesos_id' in definition:
-                self.mesos_id = definition['mesos_id']
+            if 'mesos_id' in self.definition:
+                self.mesos_id = self.definition['mesos_id']
             else:
                 self.mesos_id = self.definition.get('id','hippo') + '.' + str(uuid.uuid4())
                 self.definition['mesos_id'] = self.mesos_id
@@ -46,6 +48,18 @@ class HippoTask(object):
     @classmethod
     def all_tasks(cls, redis_client):
         return cls.tasks_from_ids(redis_client.zrange('hippo:all_taskid_list',0,-1), redis_client)
+
+    @classmethod
+    def cleanup_old_tasks(cls, redis_client):
+        tasks = cls.all_tasks(redis_client)
+        count = 0
+        cutoff = time.time() - config.TASK_RETENTION_SECONDS
+        for t in tasks:
+            if 'status_tstamp' not in t.definition or \
+               (t.definition['status_tstamp'] < cutoff and t.definition.get('mesos_state','') in MESOS_FINAL_STATES):
+                t.delete()
+                count += 1
+        logging.info('Deleted %d old tasks' % count)
 
     @classmethod
     def kill_tasks(cls, redis_client):
@@ -74,7 +88,7 @@ class HippoTask(object):
         pipe.lrem('hippo:working_taskid_list',0,self.mesos_id)
         pipe.lrem('hippo:kill_taskid_list',0,self.mesos_id)
         pipe.zrem('hippo:all_taskid_list',self.mesos_id)
-        pipe.rem(self.mesos_id)
+        pipe.delete(self.mesos_id)
         pipe.execute()
 
     def load(self):
@@ -85,6 +99,7 @@ class HippoTask(object):
             self.definition = json.loads(body)
 
     def save(self):
+        self.definition['status_tstamp'] = time.time()
         self.redis.set(self.mesos_id,json.dumps(self.definition))
 
     def queue(self):
@@ -181,6 +196,9 @@ MESOS_SYSTEM_ERRORS = ['TASK_KILLED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
 
 
 MESOS_TASK_ERRORS = ['TASK_FAILED']
+
+
+MESOS_FINAL_STATES = MESOS_TASK_ERRORS + MESOS_SYSTEM_ERRORS + ['TASK_FINISHED']
 
 
 TASK_SCHEMA = {

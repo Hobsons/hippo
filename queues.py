@@ -1,6 +1,7 @@
 import json
 import uuid
 import time
+import copy
 import config
 from threading import Thread, Lock
 from queue import Queue
@@ -104,7 +105,7 @@ class HippoQueue(object):
     def delete(self):
         pipe = self.redis.pipeline()
         pipe.lrem('hippo:all_queueid_list',0,'hippo:queue:' + self.id)
-        pipe.rem('hippo:queue:' + self.id)
+        pipe.delete('hippo:queue:' + self.id)
         pipe.execute()
 
     def validate(self):
@@ -115,7 +116,7 @@ class HippoQueue(object):
         return str(v.errors)
 
 
-QUEUE_SCHEMA = TASK_SCHEMA.update(
+QUEUE_SCHEMA = copy.copy(TASK_SCHEMA).update(
     {
         "queue": {
             "type": "dict",

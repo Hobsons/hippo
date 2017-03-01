@@ -1,4 +1,4 @@
-import uuid
+import time
 import logging
 from pymesos import Scheduler, encode_data
 from tasks import HippoTask
@@ -47,7 +47,7 @@ class HippoScheduler(Scheduler):
 
     def statusUpdate(self, driver, update):
         t = HippoTask(mesos_id=update.task_id.value,redis_client=self.redis)
-        t.definition['mesos_status'] = update.state
+        t.definition['mesos_state'] = update.state
         t.save()
         if update.state in ['TASK_FINISHED','TASK_FAILED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
                             'TASK_KILLED','TASK_UNREACHABLE','TASK_GONE','TASK_GONE_BY_OPERATOR']:

@@ -18,8 +18,10 @@ from kazoo.recipe.election import Election
 def reconcile(driver, redis_client):
     # reconcile tasks every 15 minutes
     def _rcile():
+        # give time for driver to connect first
+        time.sleep(5)
         while True:
-            running_task_ids = [dict(task_id=t.mesos_id) for t in HippoTask.working_tasks(redis_client)]
+            running_task_ids = [dict(task_id={'value':t.mesos_id}) for t in HippoTask.working_tasks(redis_client)]
             if running_task_ids:
                 logging.info('Reconciling %d tasks' % len(running_task_ids))
                 driver.reconcileTasks(running_task_ids)
@@ -36,7 +38,7 @@ def kill_task(driver, redis_client):
             kill_tasks = HippoTask.kill_tasks(redis_client)
             for t in kill_tasks:
                 logging.info('Killing task %s' % t.mesos_id)
-                driver.killTask(t.mesos_id)
+                driver.killTask({'value':t.mesos_id})
                 t.kill_complete()
             time.sleep(2)
     t = Thread(target=_kt,args=(),daemon=True)
@@ -69,18 +71,26 @@ def leader():
 
     driver_thread = Thread(target=run_driver_thread, args=())
     driver_thread.start()
+    logging.info('Started mesos schedule driver thread')
 
     signal.signal(signal.SIGINT, signal_handler)
 
     # reconcile will run every 15 minutes in it's own thread
     reconcile(driver, redis_client)
+    logging.info('Started reconcile task thread')
+
 
     # kill task will run every 2 seconds in it's own thread to kill any tasks that need killin'
     kill_task(driver, redis_client)
+    logging.info('Started kill task thread')
+
 
     # hippo queue will run a thread pool to monitor queues for work and create tasks
     HippoQueue.process_queues(redis_client)
+    logging.info('Started queue processing thread')
 
+    # delete any ancient tasks so that we don't have them clog things up forever
+    HippoTask.cleanup_old_tasks(redis_client)
 
     while driver_thread.is_alive():
         time.sleep(1)
