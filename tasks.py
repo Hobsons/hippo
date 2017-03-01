@@ -1,3 +1,4 @@
+import copy
 import json
 import time
 import uuid
@@ -47,6 +48,10 @@ class HippoTask(object):
         return cls.tasks_from_ids(redis_client.zrange('hippo:all_taskid_list',0,-1), redis_client)
 
     @classmethod
+    def kill_tasks(cls, redis_client):
+        return cls.tasks_from_ids(redis_client.lrange('hippo:kill_taskid_list',0,-1), redis_client)
+
+    @classmethod
     def waiting_tasks(cls, redis_client):
         return cls.tasks_from_ids(redis_client.lrange('hippo:waiting_taskid_list',0,-1), redis_client)
 
@@ -67,6 +72,7 @@ class HippoTask(object):
         pipe = self.redis.pipeline()
         pipe.lrem('hippo:waiting_taskid_list',0,self.mesos_id)
         pipe.lrem('hippo:working_taskid_list',0,self.mesos_id)
+        pipe.lrem('hippo:kill_taskid_list',0,self.mesos_id)
         pipe.zrem('hippo:all_taskid_list',self.mesos_id)
         pipe.rem(self.mesos_id)
         pipe.execute()
@@ -95,7 +101,23 @@ class HippoTask(object):
         self.redis.lrem('hippo:working_taskid_list',0,self.mesos_id)
 
     def retry(self):
-        pass
+        new_def = copy.copy(self.definition)
+        del new_def['mesos_id']
+        if self.definition['mesos_state'] in MESOS_SYSTEM_ERRORS and self.definition['system_retries'] > 0:
+            new_def['system_retries'] -= 1
+        elif self.definition['mesos_state'] in MESOS_TASK_ERRORS and self.definition['task_retries'] > 0:
+            new_def['task_retries'] -= 1
+        else:
+            new_def = None
+        if new_def:
+            t = HippoTask(definition=new_def,redis_client=self.redis)
+            t.queue()
+
+    def kill(self):
+        self.redis.lpush('hippo:kill_taskid_list',self.mesos_id)
+
+    def kill_complete(self):
+        self.redis.lrem('hippo:kill_taskid_list',0,self.mesos_id)
 
     def definition_id(self):
         return self.definition.get('id','')
@@ -110,6 +132,17 @@ class HippoTask(object):
         return self.definition.get('max_concurrent',10000)
 
     def constraints_ok(self,offer):
+        offer_attributes = {}
+        for a in offer.get('attributes',[]):
+            offer_attributes[a['name']] = a.get('text','')
+
+        for constraint_tuple in self.definition.get('contraints',[]):
+            if len(constraint_tuple) == 3:
+                attr, op, val = constraint_tuple
+                if op in ['CLUSTER','EQUAL','LIKE'] and offer_attributes.get(attr) != val:
+                    return False
+                if op in ['UNEQUAL','UNLIKE'] and offer_attributes.get(attr) == val:
+                    return False
         return True
 
     def validate(self):
@@ -140,6 +173,14 @@ class HippoTask(object):
                 dict(mode=v['mode'],container_path=v['containerPath'],host_path=v['hostPath']) for v in self.definition['container']['volumes']
             ]
         return d
+
+
+MESOS_SYSTEM_ERRORS = ['TASK_KILLED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
+                       'TASK_UNREACHABLE','TASK_GONE','TASK_GONE_BY_OPERATOR',
+                       'TASK_UNKNOWN']
+
+
+MESOS_TASK_ERRORS = ['TASK_FAILED']
 
 
 TASK_SCHEMA = {

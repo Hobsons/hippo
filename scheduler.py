@@ -52,6 +52,8 @@ class HippoScheduler(Scheduler):
         if update.state in ['TASK_FINISHED','TASK_FAILED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
                             'TASK_KILLED','TASK_UNREACHABLE','TASK_GONE','TASK_GONE_BY_OPERATOR']:
             t.finish()
+        if update.state != 'TASK_FINISHED':
+            t.retry()
         logging.debug('Status update TID %s %s',
                       update.task_id.value,
                       update.state)

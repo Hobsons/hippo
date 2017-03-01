@@ -19,12 +19,27 @@ def reconcile(driver, redis_client):
     # reconcile tasks every 15 minutes
     def _rcile():
         while True:
-            running_task_ids = [dict(task_id=t.id()) for t in HippoTask.working_tasks(redis_client=redis_client)]
+            running_task_ids = [dict(task_id=t.mesos_id) for t in HippoTask.working_tasks(redis_client)]
             if running_task_ids:
                 logging.info('Reconciling %d tasks' % len(running_task_ids))
                 driver.reconcileTasks(running_task_ids)
             time.sleep(60 * 15)
     t = Thread(target=_rcile,args=(),daemon=True)
+    t.start()
+    return t
+
+
+def kill_task(driver, redis_client):
+    # check for tasks to kill every 2 seconds
+    def _kt():
+        while True:
+            kill_tasks = HippoTask.kill_tasks(redis_client)
+            for t in kill_tasks:
+                logging.info('Killing task %s' % t.mesos_id)
+                driver.killTask(t.mesos_id)
+                t.kill_complete()
+            time.sleep(2)
+    t = Thread(target=_kt,args=(),daemon=True)
     t.start()
     return t
 
@@ -59,6 +74,9 @@ def leader():
 
     # reconcile will run every 15 minutes in it's own thread
     reconcile(driver, redis_client)
+
+    # kill task will run every 2 seconds in it's own thread to kill any tasks that need killin'
+    kill_task(driver, redis_client)
 
     # hippo queue will run a thread pool to monitor queues for work and create tasks
     HippoQueue.process_queues(redis_client)
