@@ -1,0 +1,126 @@
+<html>
+  <head>
+    <title>Hippo Framework</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/bootstrap@3.3.7/dist/css/bootstrap.min.css">
+    <script src="https://unpkg.com/vue@2.2.1/dist/vue.min.js"></script>
+    <script src="https://unpkg.com/jquery@3.1.1/dist/jquery.min.js"></script>
+    <script src="https://unpkg.com/bootstrap@3.3.7/dist/js/bootstrap.min.js"></script>
+    <script type="text/javascript">
+      window.onload = function() {
+        var app = new Vue({
+          el: '#app',
+          data: {
+            tasks: []
+          },
+          filters: {
+            timestampToDate: function (value) {
+              if (!value) return '';
+              var dt = new Date(value * 1000);
+              return dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString();
+            }
+
+          },
+          methods: {
+            killTask: function(mesosId) {
+              $.get('/tasks/' + mesosId + '/kill/');
+            },
+            deleteTask: function(mesosId) {
+              $.ajax({
+                url:'/tasks/' + mesosId + '/',
+                method:'DELETE'
+              });
+              app.tasks = app.tasks.filter(function (t) {
+                return t.mesos_id != mesosId
+              })
+            },
+            stateStyle: function(value) {
+              if(value == 'TASK_FINISHED') {
+                return ['text-success'];
+              }
+              if(['TASK_FAILED','TASK_LOST','TASK_KILLED'].includes(value)) {
+                return ['text-danger'];
+              }
+              if(['TASK_STAGING','TASK_RUNNING'].includes(value)) {
+                return ['text-primary'];
+              }
+              return [];
+            }
+          }
+        });
+
+        function update_tasks() {
+          $.getJSON('/tasks/',function(data) {
+            data.reverse();
+            app.tasks = data;
+          });
+        }
+
+        update_tasks();
+        setInterval(update_tasks, 2000);
+      }
+
+
+    </script>
+  </head>
+  <body>
+    <h2 style="padding-left:10px;">Hippo Framework  allow for queue disable without delete!!!</h2>
+    <div id="app" style="padding-top:10px;">
+      <ul class="nav nav-tabs" role="tablist">
+        <li role="presentation" class="active" style="padding-left:20px;">
+          <a href="#tasks" aria-controls="tasks" role="tab" data-toggle="tab">
+            <h4>Tasks</h4>
+          </a>
+        </li>
+        <li role="presentation">
+          <a href="#queues" aria-controls="queues" role="tab" data-toggle="tab">
+            <h4>Queues</h4>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Tab panes -->
+      <div class="tab-content">
+        <div role="tabpanel" class="tab-pane active" id="tasks">
+          <div class="row" style></div>
+          <div class="row" style="padding:10px;">
+            <div class="col-xs-12">
+              <table class="table table-bordered table-condensed">
+                <tr>
+                  <th>Id</th>
+                  <th>State</th>
+                  <th>Updated</th>
+                  <th>Image</th>
+                  <th>Command</th>
+                  <th>Actions</th>
+                </tr>
+                <template v-for="task in tasks" :key="task.mesos_id">
+                  <tr>
+                    <td>{{task.mesos_id}}</td>
+                    <td><p v-bind:class="stateStyle(task.mesos_state)">{{task.mesos_state}}</p></td>
+                    <td>{{task.status_tstamp | timestampToDate }}</td>
+                    <td>{{task.container.docker.image}}</td>
+                    <td>{{task.cmd}}</td>
+                    <td>
+                      <button class="btn btn-xs btn-warning" v-on:click="killTask(task.mesos_id)" v-if="task.mesos_state == 'TASK_RUNNING' || task.mesos_state == 'TASK_STAGING'">
+                        Kill <span class="glyphicon glyphicon-screenshot"></span>
+                      </button>
+                      <button class="btn btn-xs btn-danger" v-on:click="deleteTask(task.mesos_id)" v-else="task.mesos_state == 'TASK_RUNNING' || task.mesos_state == 'TASK_STAGING'">
+                        Delete <span class="glyphicon glyphicon-remove"></span>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div role="tabpanel" class="tab-pane" id="queues">
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </body>
+</html>

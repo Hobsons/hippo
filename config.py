@@ -1,6 +1,6 @@
 import os
 
-REDIS_HOST = os.getenv('REDIS_HOST')
+REDIS_HOST = os.getenv('REDIS_HOST','127.0.0.1')
 if ':' in REDIS_HOST:
     REDIS_HOST, REDIS_PORT = REDIS_HOST.split(':')
 else:

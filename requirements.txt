@@ -1,0 +1,8 @@
+kazoo
+pymesos
+cerberus
+addict
+redis
+fakeredis
+psycopg2
+

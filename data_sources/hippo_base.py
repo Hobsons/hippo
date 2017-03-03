@@ -1,4 +1,5 @@
 import time
+import copy
 import base64
 
 
@@ -7,7 +8,7 @@ class HippoDataSource(object):
         self.hippo_queue = hippo_queue
         self.hippo_redis = hippo_redis
         self.working_count = working_count
-        self.definition = self.hippo_queue.definition
+        self.definition = copy.copy(self.hippo_queue.definition)
         self.last_run_tstamp = self.definition['queue'].get('last_run_tstamp')
         self.frequency_seconds = self.definition['queue'].get('frequency_seconds',1)
         self.max_concurrent = self.definition['queue'].get('max_concurrent',self.definition.get('max_concurrent',10000))
@@ -33,9 +34,9 @@ class HippoDataSource(object):
     def create_tasks(self, items):
         chunks = [items[i:i + self.batch_size] for i in range(0, len(items), self.batch_size)]
         for batch in chunks:
-            data = self.batch_separator.join(batch)
-            b64data = base64.b64encode(data)
-            task_def = self.definition
+            data = self.batch_separator.join([s.decode() if not isinstance(s,str) else s for s in batch])
+            b64data = base64.b64encode(data.encode()).decode()
+            task_def = copy.copy(self.definition)
             del task_def['queue']
             task_def['max_concurrent'] = self.max_concurrent
             task_def['cmd'] = task_def['cmd'].replace('$HIPPO_DATA_BASE64',b64data).replace('$HIPPO_DATA',data)

@@ -76,26 +76,31 @@ def leader():
     signal.signal(signal.SIGINT, signal_handler)
 
     # reconcile will run every 15 minutes in it's own thread
-    reconcile(driver, redis_client)
+    reconcile_thread = reconcile(driver, redis_client)
     logging.info('Started reconcile task thread')
 
 
     # kill task will run every 2 seconds in it's own thread to kill any tasks that need killin'
-    kill_task(driver, redis_client)
+    kill_thread = kill_task(driver, redis_client)
     logging.info('Started kill task thread')
 
 
     # hippo queue will run a thread pool to monitor queues for work and create tasks
-    HippoQueue.process_queues(redis_client)
+    process_queue_thread = HippoQueue.process_queues(redis_client)
     logging.info('Started queue processing thread')
 
     # delete any ancient tasks so that we don't have them clog things up forever
     HippoTask.cleanup_old_tasks(redis_client)
 
-    while driver_thread.is_alive():
+    while driver_thread.is_alive() and \
+          reconcile_thread.is_alive() and \
+          kill_thread.is_alive() and \
+          process_queue_thread.is_alive():
+        # main thread just sleeps as long as all the child threads are still running
         time.sleep(1)
 
     logging.debug('...Exiting')
+    exit(0)
 
 
 if __name__ == '__main__':

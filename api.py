@@ -1,12 +1,18 @@
 import os
 import redis
 import config
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from tasks import HippoTask
 from queues import HippoQueue
 
-app = Flask(__name__)
+app = Flask(__name__,static_url_path='')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.redis = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB, password=config.REDIS_PW)
+
+
+@app.route('/',methods=['GET'])
+def index():
+    return app.send_static_file('index.html')
 
 
 @app.route('/tasks/',methods=['GET','POST'])

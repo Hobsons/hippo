@@ -3,8 +3,8 @@ from data_sources.hippo_base import HippoDataSource
 
 
 class RedisQueue(HippoDataSource):
-    def __init__(self, hippo_queue, working_count):
-        super().__init__(hippo_queue, working_count)
+    def __init__(self, *args):
+        super().__init__(*args)
         self.host = self.definition['queue'].get('redis',{}).get('host')
         self.port = int(self.definition['queue'].get('redis',{}).get('port','6379'))
         self.db = int(self.definition['queue'].get('redis',{}).get('db',0))

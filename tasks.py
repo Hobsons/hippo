@@ -151,7 +151,7 @@ class HippoTask(object):
         for a in offer.get('attributes',[]):
             offer_attributes[a['name']] = a.get('text','')
 
-        for constraint_tuple in self.definition.get('contraints',[]):
+        for constraint_tuple in self.definition.get('constraints',[]):
             if len(constraint_tuple) == 3:
                 attr, op, val = constraint_tuple
                 if op in ['CLUSTER','EQUAL','LIKE'] and offer_attributes.get(attr) != val:
