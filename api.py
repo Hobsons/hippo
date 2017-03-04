@@ -92,5 +92,19 @@ def single_queue(queue_id):
     return jsonify(q.definition)
 
 
+@app.route('/queues/<queue_id>/<toggle>/',methods=['GET'])
+def single_queue_enabgle_toggle(queue_id, toggle):
+    q = HippoQueue(id=queue_id,redis_client=app.redis)
+    if not q.definition:
+        return jsonify({"error":queue_id + " not found"}), 404
+
+    if toggle == 'enable':
+        q.enable()
+        return jsonify({"enabled": queue_id})
+    else:
+        q.disable()
+        return jsonify({"disabled": queue_id})
+
+
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)

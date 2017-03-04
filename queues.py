@@ -21,6 +21,8 @@ class HippoQueue(object):
         if id is None:
             self.id = self.definition.get('id','hippo-queue' + '.' + str(uuid.uuid4()))
             self.definition['id'] = self.id
+            if 'status' not in self.definition['queue']:
+                self.definition['queue']['status'] = 'ENABLED'
             self.save()
             redis_id = 'hippo:queue:' + self.id
             if redis_id not in [i.decode() for i in redis_client.lrange('hippo:all_queueid_list',0,-1)]:
@@ -105,7 +107,7 @@ class HippoQueue(object):
         for p in processors:
             if p.__name__.upper() == qtype.upper():
                 dp = p(self, working_count, HippoTask, self.redis)
-                if not dp.too_soon():
+                if self.is_enabled() and not dp.too_soon():
                     dp.process_source()
                 break
 
@@ -118,6 +120,17 @@ class HippoQueue(object):
             self.definition = {}
         else:
             self.definition = json.loads(body)
+
+    def is_enabled(self):
+        return 'status' not in self.definition['queue'] or self.definition['queue']['status'] == 'ENABLED'
+
+    def enable(self):
+        self.definition['queue']['status'] = 'ENABLED'
+        self.save()
+
+    def disable(self):
+        self.definition['queue']['status'] = 'DISABLED'
+        self.save()
 
     def delete(self):
         pipe = self.redis.pipeline()
@@ -168,7 +181,12 @@ QUEUE_SCHEMA = {
             },
             "last_run_tstamp": {
                 "type":"integer"
+            },
+            "status": {
+                "type":"string",
+                "allowed":["ENABLED","DISABLED"]
             }
+
 
         }
     }
