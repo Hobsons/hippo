@@ -114,6 +114,7 @@ def queue_types():
     for p in processors:
         qtlist.append({
             'namespace':p.namespace,
+            'label':p.label,
             'inputs':p.inputs
         })
     return jsonify(qtlist)

@@ -4,11 +4,12 @@ from data_sources.hippo_base import HippoDataSource
 
 class RedisQueue(HippoDataSource):
     namespace = 'redis'
+    label = 'Redis Queue'
     inputs = {
-        'host': {'type':'string'},
-        'port': {'type':'number','default':6379},
-        'db'  : {'type':'number','default':0},
-        'name': {'type':'string'}
+        'host': {'input':'text','label':'Redis Host'},
+        'port': {'input':'number','label':'Redis Port','default':6379},
+        'db'  : {'input':'number','label':'Redis DB','default':0},
+        'name': {'input':'text','label':'Redis Queue Key Name'}
     }
 
     def __init__(self, *args):

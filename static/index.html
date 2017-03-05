@@ -97,19 +97,58 @@
         $.getJSON('/queues/' + id + '/disable/');
       }
 
-      function loadQueueSpecifics(t_ns) {
-        for (qtype of latest_queue_types) {
-          if (qtype.namespace == t_ns) {
-            
+      function findQueue(id) {
+        for(q of latest_queues) {
+          if (q.id == id) {
+            return q
           }
         }
+        return null;
+      }
+
+      function arrayChunks(a, size) {
+        var chunks = [], i;
+        for (i = 0; i < a.length; i += size) {
+          chunks.push(a.slice(i, i + size));
+        }
+        return chunks;
+      }
+
+      function loadQueueSpecifics(q, t_ns) {
+        $("#detailsModalQueueSpecifics").html("");
+        var output = '';
+        for (var qtype of latest_queue_types) {
+          if (qtype.namespace == t_ns) {
+            var input_tups = [];
+            for (var input_name in qtype.inputs) {
+              input_tups.push([input_name,qtype.inputs[input_name]]);
+            }
+            var input_chunks = arrayChunks(input_tups,2);
+            for(var chunk of input_chunks) {
+              output += '<div class="row">';
+              for(var input of chunk) {
+                var name = input[0];
+                var details = input[1];
+                var def = '';
+                if(details.default != null) {
+                  def = details.default;
+                }
+                output += `<div class="form-group col-xs-6">
+                    <label>${details.label}</label>
+                    <input id="inputQueueSpecific_${name}" type="${details.input}" class="form-control " placeholder="${def}" />
+                  </div>`
+              }
+              output += '</div>\n';
+            }
+          }
+        }
+        $("#detailsModalQueueSpecifics").html(output);
       }
 
       function queueDetails(id, btn) {
         $(".tm-widget").hide();
         $(".qm-widget").show();
-        $("#detailsModalQueueSpecifics").html("");
-
+        loadQueueSpecifics(findQueue(q),'redis');
         $("#details-modal").modal();
       }
 
@@ -122,6 +161,7 @@
           dataType: 'json'
         });
       }
+
 
 
       $( document ).ready(function() {
@@ -244,14 +284,17 @@
         update_queues();
         setInterval(update_queues, 3000);
 
-        function update_queue_types() {
+        (function update_queue_types() {
           $.getJSON('/queuetypes/',function(data){
             latest_queue_types = data;
-          })
-        }
+            var qtype_options = '';
+            for(var qtype of latest_queue_types) {
+              qtype_options += `<option value="${qtype.namespace}">${qtype.label}</option>\n`;
+            }
+            $("#selectQueueType").html(qtype_options)
+;          })
+        })();
 
-        update_queue_types();
-        setInterval(update_queuetypes, 3000);
 
         $('.dataTables_filter input[type="search"]').css({'width':'300px','display':'inline-block','font-size':'1.3em','height':'36px'}).
           parent().css({'float':'left'});
@@ -338,11 +381,7 @@
                 <div class="row">
                   <div class="form-group col-xs-4">
                     <label>Queue Type</label>
-                    <select class="form-control" id="selectType">
-                      <option value="DEFAULT">Managed Standard Job</option>
-                      <option value="PIPELINE_J">Managed Pipeline Jenkinsfile Job</option>
-                      <option value="PIPELINE_S">Managed Pipeline Script Job</option>
-                      <option value="CUSTOM">Unmanaged Job</option>
+                    <select class="form-control" id="selectQueueType">
                     </select>
                   </div>
                   <div class="form-group col-xs-4">
