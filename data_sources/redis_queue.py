@@ -3,12 +3,16 @@ from data_sources.hippo_base import HippoDataSource
 
 
 class RedisQueue(HippoDataSource):
+    namespace = 'redis'
+    inputs = {
+        'host': {'type':'string'},
+        'port': {'type':'number','default':6379},
+        'db'  : {'type':'number','default':0},
+        'name': {'type':'string'}
+    }
+
     def __init__(self, *args):
-        super().__init__(*args)
-        self.host = self.definition['queue'].get('redis',{}).get('host')
-        self.port = int(self.definition['queue'].get('redis',{}).get('port','6379'))
-        self.db = int(self.definition['queue'].get('redis',{}).get('db',0))
-        self.name = self.definition['queue'].get('redis',{}).get('name')
+        super().__init__(*args, namespace=RedisQueue.namespace, inputs=RedisQueue.inputs)
 
     def process(self):
         if not self.name or not self.host:

@@ -29,18 +29,41 @@
         });
       }
 
-      function rerunTask(mesosId, btn) {
-        $(btn).button('loading');
+      function findTask(mesosId) {
         for(t of latest_tasks) {
-          if(t.mesos_id == mesosId) {
-            var new_task = Object.assign({},t);
-            delete new_task.mesos_id;
-            delete new_task.mesos_state;
-            delete new_task.status_tstamp;
-            postTask(new_task);
-            break;
+          if (t.mesos_id == mesosId) {
+            return t
           }
         }
+        return null;
+      }
+
+      function rerunTask(mesosId, btn) {
+        $(btn).button('loading');
+        var t = findTask(mesosId);
+        if(t) {
+          var new_task = Object.assign({},t);
+          delete new_task.mesos_id;
+          delete new_task.mesos_state;
+          delete new_task.status_tstamp;
+          postTask(new_task);
+        }
+      }
+
+      function loadTaskModalFields(t) {
+        if(t) {
+          $("#inputDockerImage").val(t.container.docker.image);
+          $("#inputCommand").val(t.cmd);
+          $("#inputCpu").val(t.cpus);
+          $("#inputMem").val(t.mem);
+        }
+      }
+
+      function taskDetails(id, btn) {
+        $(".tm-widget").show();
+        $(".qm-widget").hide();
+        loadTaskModalFields(findTask(id));
+        $("#details-modal").modal();
       }
 
       function postTask(task) {
@@ -54,6 +77,7 @@
       }
 
       var latest_queues = [];
+      var latest_queue_types = [];
 
       function deleteQueue(id, btn) {
         $(btn).button('loading');
@@ -71,6 +95,22 @@
       function disableQueue(id, btn) {
         $(btn).button('loading');
         $.getJSON('/queues/' + id + '/disable/');
+      }
+
+      function loadQueueSpecifics(t_ns) {
+        for (qtype of latest_queue_types) {
+          if (qtype.namespace == t_ns) {
+            
+          }
+        }
+      }
+
+      function queueDetails(id, btn) {
+        $(".tm-widget").hide();
+        $(".qm-widget").show();
+        $("#detailsModalQueueSpecifics").html("");
+
+        $("#details-modal").modal();
       }
 
       function postQueue(queue) {
@@ -204,6 +244,15 @@
         update_queues();
         setInterval(update_queues, 3000);
 
+        function update_queue_types() {
+          $.getJSON('/queuetypes/',function(data){
+            latest_queue_types = data;
+          })
+        }
+
+        update_queue_types();
+        setInterval(update_queuetypes, 3000);
+
         $('.dataTables_filter input[type="search"]').css({'width':'300px','display':'inline-block','font-size':'1.3em','height':'36px'}).
           parent().css({'float':'left'});
       });
@@ -276,7 +325,7 @@
 
     </div>
 
-    <div class="modal fade" id="queue-modal">
+    <div class="modal fade" id="details-modal">
       <div class="modal-dialog" style="width:700px;">
         <div class="modal-content">
           <div class="modal-header">
@@ -285,230 +334,108 @@
           </div>
           <div class="modal-body">
             <form role="form">
-              <div class="row">
-
-                <div class="form-group">
-
-                  <label>Type</label>
-                  <select class="form-control" id="selectType">
-                    <option value="DEFAULT">Managed Standard Job</option>
-                    <option value="PIPELINE_J">Managed Pipeline Jenkinsfile Job</option>
-                    <option value="PIPELINE_S">Managed Pipeline Script Job</option>
-                    <option value="CUSTOM">Unmanaged Job</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label>Remote Hesos Build</label><br>
-                  <span id="span-remote-build-info"></span>
-                </div>
-
-
-
-                <div class="form-group">
-                    <label>Build Engine</label><br>
-                    <select class="form-control" id="selectBuildJobEngine">
-                      {% for bengine in build_engines %}
-                      <option value="{{ bengine.id }}">{{ bengine.name }}{% if bengine.default %} (default){% endif %}</option>
-                      {% endfor %}
+              <div id="detailsModalQueueInfo" class="qm-widget">
+                <div class="row">
+                  <div class="form-group col-xs-4">
+                    <label>Queue Type</label>
+                    <select class="form-control" id="selectType">
+                      <option value="DEFAULT">Managed Standard Job</option>
+                      <option value="PIPELINE_J">Managed Pipeline Jenkinsfile Job</option>
+                      <option value="PIPELINE_S">Managed Pipeline Script Job</option>
+                      <option value="CUSTOM">Unmanaged Job</option>
                     </select>
                   </div>
-
-
-                  <div class="form-group col-xs-6">
-                    <label>Git Repository Url</label>
-                    <input id="inputBuildGitRep" type="text" class="form-control" placeholder="https://github.com/Hobsons/my-repo.git" />
+                  <div class="form-group col-xs-4">
+                    <label>Name</label>
+                    <input id="inputQueueName" type="text" class="form-control" />
                   </div>
-
-                        <div class="form-group col-xs-6">
-                          <label>Branch/Tag Name in Jenkins Format</label>
-                          <input id="inputBuildGitRef" type="text" class="form-control" placeholder="Enter branch or tag ref" />
-                          <span style="font-size:0.8em;font-style:italic;">refs/heads/master or refs/tags/mytag, etc.</span>
-                        </div>
-                      </div>
-
-                      <div class="row">
-                        <div class="form-group col-xs-12">
-                          <label>Sparse Checkout Paths</label>
-                          <input id="inputBuildGitSparsePaths" type="text" class="form-control" />
-                          <span style="font-size:0.8em;font-style:italic;">Checkout only certain paths in the repo. Comma separate multiple paths.</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div id="build-modal-jenkinsfile-block">
-                      <div class="row">
-                        <div class="form-group col-xs-12">
-                          <label>Jenkinsfile Path</label>
-                          <input id="inputBuildJenkinsfile" type="text" class="form-control" placeholder="/my/jenkinsfile/path/Jenkinsfile-custom" />
-                          <span style="font-size:0.8em;font-style:italic;">Defaults to "Jenkinsfile" in project root</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div id="build-modal-pipeline-script-block">
-                      <div class="row">
-                        <div class="form-group col-xs-12">
-                          <label>Pipeline Script Body</label>
-                          <textarea id="inputBuildPipelineScript" rows="6" class="form-control" placeholder="" ></textarea>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div id="build-modal-docker-info-block">
-                      <div class="row">
-                        <div class="form-group col-xs-6">
-                          <label>Path to Dockerfile in Repository</label>
-                          <input id="inputBuildDockerfilePath" type="text" class="form-control" placeholder="/my/build/path/Dockerfile-custom" />
-                          <span style="font-size:0.8em;font-style:italic;">Defaults to "Dockerfile" in repository root</span>
-                        </div>
-                        <div class="form-group col-xs-6">
-                          <label>Docker Build Path in Repository</label>
-                          <input id="inputBuildDockerBuildPath" type="text" class="form-control" placeholder="/my/build/path" />
-                          <span style="font-size:0.8em;font-style:italic;">Defaults to repository root</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div id="build-modal-custom-jenkins-jobname" class="form-group">
-                      <label>Jenkins Job Name</label>
-                      <input id="inputBuildJenkinsJobName" type="text" class="form-control" placeholder="my-job-name" />
-                    </div>
-
-                    <div class="form-group">
-                      <div class="row">
-                        <div class="form-group col-xs-6" id="build-modal-image-block">
-                          <label>Docker Image</label><br>
-                          <input type="checkbox" id="cbBuildGeneratesDockerImage" checked value=""> Build should generate docker image
-                        </div>
-                        <div class="form-group col-xs-6" id="build-modal-timeout-block">
-                          <label>Build Timeout Minutes</label><br>
-                          <input type="number" id="inputBuildTimeout" value="0" min="0" max="360">
-                          <span style="font-size:0.8em;font-style:italic;">If 0, defaults to hesos system default</span>
-                        </div>
-                      </div>
-                    </div>
-
+                  <div class="form-group col-xs-4">
+                    <label>Task Prefix</label>
+                    <input id="inputQueuePrefix" type="text" class="form-control" />
                   </div>
-
-                  <div class="tab-pane" id="build-tab-coverage">
-                    <div class="form-group">
-                      <label>Coverage Type</label>
-                      <select class="form-control" id="selectBuildCoverageType">
-                        <option value="NONE">None</option>
-                        <option value="COBERTURA">Cobertura</option>
-                        <option value="JACOCO">Jacoco</option>
-                      </select>
-                    </div>
-
-                    <div id="build-modal-cobertura-block">
-                      <div class="form-group">
-                        <label>Cobertura Report Directory</label>
-                        <input id="inputBuildCoberturaReport" type="text" class="form-control" placeholder="**/coverage.xml" />
-                      </div>
-                    </div>
-
-                    <div id="build-modal-jacoco-block">
-                      <div class="form-group">
-                        <label>Jacoco Exec Pattern</label>
-                        <input id="inputBuildJacocoExecPattern" type="text" class="form-control" placeholder="**/**.exec" />
-                      </div>
-                      <div class="form-group">
-                        <label>Jacoco Class Pattern</label>
-                        <input id="inputBuildJacocoClassPattern" type="text" class="form-control" placeholder="**/classes" />
-                      </div>
-                      <div class="form-group">
-                        <label>Jacoco Source Pattern</label>
-                        <input id="inputBuildJacocoSourcePattern" type="text" class="form-control" placeholder="**/src/main/java" />
-                      </div>
-                    </div>
-
-                    <div id="build-modal-coverage-min-block">
-                      <div class="form-group">
-                        <label>Minimum Line Coverage % Required To Pass</label>
-                        <input id="inputBuildCoverageMinimum" type="text" class="form-control" placeholder="85" />
-                      </div>
-                    </div>
-
-                    <div class="form-group">
-                      <label>Sonar</label><br>
-                      <input type="checkbox" id="cbBuildSonar" value=""> Enable
-                    </div>
-
-                    <div id="build-modal-sonar-block">
-                      <div class="form-group">
-                        <label>Sonar Properties</label>
-                        <textarea id="inputBuildSonarProperties" rows="3" class="form-control" placeholder="" ></textarea>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  <!-- /.tab-pane -->
-                  <div class="tab-pane" id="build-tab-advanced">
-
-                   <div class="form-group">
-                     <label>Additional Shell Commands</label>
-                     <textarea id="textBuildCommands" class="form-control" style="white-space:pre;" rows="3" placeholder="/scripts/run_tests.sh"></textarea>
-                     <span style="font-size:0.8em;font-style:italic;">
-                       To run commands in a container of this image, use a command of the form "docker run [my options] $BUILD_IMAGE [my command]".
-                       Insert $DOCKER_BUILD_COMMAND to control where in the commands the image build occurs. Put it after any commands that should run before the build occurs, and before any commands that use $BUILD_IMAGE.
-                     </span>
-                   </div>
-
-                   <div class="form-group">
-                     <label>Docker Build Params</label>
-                     <input id="inputBuildDockerBuildParams" class="form-control" type="text"></textarea>
-                     <span style="font-size:0.8em;font-style:italic;">
-                       Additional parameters to pass to the "docker build" command run to build the image. e.g. --build-arg MYVAR=MYVAL --build-arg SECRET=$HESOS_CRED(mySecret)
-                     </span>
-                   </div>
-
-                   <div class="form-group">
-                     <label>Custom Job Config</label>
-                     <textarea id="textBuildAdditionalConfig" class="form-control" rows="3" ></textarea>
-                     <span style="font-size:0.8em;font-style:italic;">
-                       Plugin or other config XML for the build job that should be passed into the build server as-is.  This xml
-                       will be smart-merged with the default config.
-                     </span>
-                     <a style="margin-top:3px;" class="btn btn-xs btn-success pull-right" onclick="Builds.validate_additional_config_btn();return false;">validate</a>
-                      <span id="buildAdditionalConfigValid" class="pull-right" style="margin-right:8px;margin-top:3px;"></span>
-                   </div>
-
-                  </div>
-                  <!-- /.tab-pane -->
-                  <div class="tab-pane" id="build-tab-prepost">
-
-                    <div class="form-group">
-                      <label>Pre-Build Hesos Commands</label>
-                      <textarea id="textPreBuildCommands" class="form-control" rows="3" ></textarea>
-                      <span style="font-size:0.8em;font-style:italic;">
-                        Hesos commands to execute before the build is started.  e.g. "ACTIVATE myapp-mydep".  See Hesos User Guide for list of commands.
-                      </span>
-                    </div>
-
-                    <div class="form-group">
-                      <label>Post-Build Hesos Commands</label>
-                      <textarea id="textPostBuildCommands" class="form-control" rows="3" ></textarea>
-                      <span style="font-size:0.8em;font-style:italic;">
-                        Hesos commands to execute after the build completes  e.g. "NOTIFY COMMITTER ON FAILURE".  See Hesos User Guide for list of commands.
-                      </span>
-                    </div>
-
-                  </div>
-                  <!-- /.tab-pane -->
                 </div>
-                <!-- /.tab-content -->
+
+                <div class="row">
+                  <div class="form-group col-xs-6">
+                    <label>Max Concurrent Tasks</label>
+                    <input id="inputQueueMaxConcurrent" type="number" class="form-control" />
+                  </div>
+                  <div class="form-group col-xs-6">
+                    <label>Polling Frequency Seconds</label>
+                    <input id="inputQueueFrequency" type="number" class="form-control" />
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="form-group col-xs-6">
+                    <label>Batch Size</label>
+                    <input id="inputQueueBatchSize" type="number" class="form-control" placeholder="0" />
+                  </div>
+                  <div class="form-group col-xs-6">
+                    <label>Batch Seperator</label>
+                    <input id="inputQueueBatchSeparator" type="text" class="form-control" placeholder="|" />
+                  </div>
+                </div>
+              </div>
+
+              <div id="detailsModalQueueSpecifics" class="qm-widget">
+
+              </div>
+
+              <div class="row">
+                <div class="form-group col-xs-6">
+                  <label>Image</label>
+                  <input id="inputDockerImage" type="text" class="form-control" />
+                  <span style="font-size:0.8em;font-style:italic;">Path to docker image and tag</span>
+                </div>
+                <div class="form-group col-xs-6">
+                  <label>Command</label>
+                  <input id="inputCommand" type="text" class="form-control" />
+                  <span style="font-size:0.8em;font-style:italic;">Command to run in the container</span>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="form-group col-xs-6">
+                  <label>Memory</label>
+                  <input id="inputMem" type="number" class="form-control" />
+                  <span style="font-size:0.8em;font-style:italic;">RAM to allocate to container</span>
+                </div>
+                <div class="form-group col-xs-6">
+                  <label>CPU</label>
+                  <input id="inputCpu" type="number" class="form-control" />
+                  <span style="font-size:0.8em;font-style:italic;">CPU priority to allocate to container</span>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="form-group col-xs-12">
+                  <label>Environment Variables</label>
+                  <textarea id="textEnv" class="form-control" style="white-space:pre;" rows="3"></textarea>
+                  <span style="font-size:0.8em;font-style:italic;">
+                    Format is "VARNAME=VARVALUE", separate multiple variables with newlines
+                  </span>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="form-group col-xs-12">
+                  <label>Volumes</label>
+                  <textarea id="textVolume" class="form-control" style="white-space:pre;" rows="3"></textarea>
+                  <span style="font-size:0.8em;font-style:italic;">
+                    Format is "host/path:container/path", separate multiple mounts with newlines
+                  </span>
+                </div>
               </div>
 
             </form>
-            <div id="queue-modal-error" class="callout callout-danger" style="display:none;margin-bottom:0px;">
+            <div id="details-modal-error" class="callout callout-danger" style="display:none;margin-bottom:0px;">
 
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-default pull-left" data-dismiss="modal">Cancel</button>
-            <button id="saveQueueBtn" type="button" class="btn btn-primary" data-loading-text="Saving...">Save</button>
+            <button id="runTaskBtn" type="button" class="btn btn-primary tm-widget" data-loading-text="Starting...">Run Task</button>
+            <button id="saveQueueBtn" type="button" class="btn btn-primary qm-widget" data-loading-text="Saving...">Save</button>
           </div>
         </div><!-- /.modal-content -->
       </div><!-- /.modal-dialog -->

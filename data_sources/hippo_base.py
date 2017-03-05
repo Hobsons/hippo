@@ -4,7 +4,7 @@ import base64
 
 
 class HippoDataSource(object):
-    def __init__(self, hippo_queue, working_count, task_class, hippo_redis):
+    def __init__(self, hippo_queue, working_count, task_class, hippo_redis, namespace='', inputs=None):
         self.hippo_queue = hippo_queue
         self.hippo_redis = hippo_redis
         self.working_count = working_count
@@ -16,6 +16,12 @@ class HippoDataSource(object):
         self.batch_separator = self.definition['queue'].get('batch_separator','|')
         self.new_task_limit = self.max_concurrent * self.batch_size - working_count
         self.task_class = task_class
+
+        if inputs:
+            for input in inputs:
+                ns = self.definition['queue'].get(namespace,{})
+                default = inputs[input].get('default')
+                setattr(self,input,ns.get(input,default))
 
     def too_soon(self):
         cur_tstamp = int(time.time())

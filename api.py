@@ -4,6 +4,7 @@ import config
 from flask import Flask, request, jsonify
 from tasks import HippoTask
 from queues import HippoQueue
+from data_sources import *
 
 app = Flask(__name__,static_url_path='')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -105,6 +106,17 @@ def single_queue_enabgle_toggle(queue_id, toggle):
         q.disable()
         return jsonify({"disabled": queue_id})
 
+
+@app.route('/queuetypes/',methods=['GET'])
+def queue_types():
+    qtlist = []
+    processors = HippoDataSource.__subclasses__()
+    for p in processors:
+        qtlist.append({
+            'namespace':p.namespace,
+            'inputs':p.inputs
+        })
+    return jsonify(qtlist)
 
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)

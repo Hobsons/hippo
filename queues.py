@@ -105,7 +105,7 @@ class HippoQueue(object):
         qtype = self.definition['queue']['type']
         processors = HippoDataSource.__subclasses__()
         for p in processors:
-            if p.__name__.upper() == qtype.upper():
+            if p.namespace.upper() == qtype.upper():
                 dp = p(self, working_count, HippoTask, self.redis)
                 if self.is_enabled() and not dp.too_soon():
                     dp.process_source()
