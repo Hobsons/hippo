@@ -50,19 +50,75 @@
         }
       }
 
+      function runTask() {
+        var t = getTaskModalFields();
+        postTask(t);
+        $("#details-modal").modal('hide');
+      }
+
       function loadTaskModalFields(t) {
         if(t) {
           $("#inputDockerImage").val(t.container.docker.image);
           $("#inputCommand").val(t.cmd);
           $("#inputCpu").val(t.cpus);
           $("#inputMem").val(t.mem);
+          $("#inputTaskPrefix").val(t.id);
+          var env_str = '';
+          if(t.env) {
+            for(var k in t.env) {
+              env_str += k + '=' + t.env[k];
+            }
+          }
+          var vol_str = '';
+          if(t.container.volumes) {
+            for(v of t.container.volumes) {
+              vol_str += v['hostPath'] + ':' + v['containerPath'];
+            }
+          }
+          $("#textEnv").val(env_str);
+          $("#textVolume").val(vol_str);
         }
+      }
+
+      function getTaskModalFields() {
+        var env_lines = $("#textEnv").val().split('\n');
+        var env = {};
+        for(l of env_lines) {
+          if(l.includes('=')) {
+            env[l.split('=')[0]] = l.split('=')[1];
+          }
+        }
+        var vol_lines = $("#textVolume").val().split('\n');
+        var volumes = [];
+        for(l of vol_lines) {
+          if(l.includes(':')) {
+            volumes.push({
+              'hostPath': l.split(':')[0],
+              'containerPath': l.split(':')[1],
+              'mode': 'RW'
+            });
+          }
+        }
+        var t = {
+          'container': { 'docker': {'image': $("#inputDockerImage").val() }},
+          'cpus': parseFloat($("#inputCpu").val()),
+          'mem': parseInt($("#inputMem").val()),
+          'cmd': $("#inputCommand").val(),
+          'env': env,
+          'id':$("#inputTaskPrefix").val()
+        };
+        if(volumes.length) {
+          t['container']['volumes'] = volumes;
+        }
+        return t;
       }
 
       function taskDetails(id, btn) {
         $(".tm-widget").show();
         $(".qm-widget").hide();
+        $("#collapseTaskSettings").collapse('show');
         loadTaskModalFields(findTask(id));
+        $("#details-modal-error").text("");
         $("#details-modal").modal();
       }
 
@@ -72,11 +128,20 @@
           url: '/tasks/',
           data: JSON.stringify(task),
           contentType: "application/json",
-          dataType: 'json'
+          dataType: 'json',
+          error: function(data) {
+            $("#details-modal-error").text(data);
+          },
+          success: function(data) {
+            if(data['error']) {
+              $("#details-modal-error").text(data['error']);
+            }
+          }
         });
       }
 
       var latest_queues = [];
+      var latest_queue_id = null;
       var latest_queue_types = [];
 
       function deleteQueue(id, btn) {
@@ -119,6 +184,7 @@
         var output = '';
         for (var qtype of latest_queue_types) {
           if (qtype.namespace == t_ns) {
+            $("#queueSpecificsHeading").text(qtype.label + ' Settings');
             var input_tups = [];
             for (var input_name in qtype.inputs) {
               input_tups.push([input_name,qtype.inputs[input_name]]);
@@ -133,9 +199,13 @@
                 if(details.default != null) {
                   def = details.default;
                 }
+                var val = '';
+                if(q && q['queue'] && q['queue'][t_ns] && q['queue'][t_ns][name]) {
+                  val = q['queue'][t_ns][name];
+                }
                 output += `<div class="form-group col-xs-6">
                     <label>${details.label}</label>
-                    <input id="inputQueueSpecific_${name}" type="${details.input}" class="form-control " placeholder="${def}" />
+                    <input id="inputQueueSpecific_${name}" type="${details.input}" class="form-control " placeholder="${def}" value="${val}" />
                   </div>`
               }
               output += '</div>\n';
@@ -148,20 +218,83 @@
       function queueDetails(id, btn) {
         $(".tm-widget").hide();
         $(".qm-widget").show();
-        loadQueueSpecifics(findQueue(q),'redis');
+        $("#collapseTaskSettings").collapse('hide');
+        $("#collapseQueueSettings").collapse('show');
+        $("#collapseQueueSpecifics").collapse('hide');
+        $("#details-modal-error").text("");
+        latest_queue_id = id;
+        var q = {};
+        if(id) {
+          q = findQueue(id);
+          $("#inputQueueMaxConcurrent").val(q['queue']['max_concurrent']);
+          $("#inputQueueFrequency").val(q['queue']['frequency_seconds']);
+          $("#inputQueueBatchSize").val(q['queue']['batch_size']);
+          $("#inputQueueBatchSeparator").val(q['queue']['batch_separator']);
+          $("#inputQueueName").val(q['queue']['name']);
+          $("#selectQueueType").val(q['queue']['type']);
+          $("#inputQueuePrefix").val(id);
+        }
+
+        loadQueueSpecifics(q,'redis');
+        loadTaskModalFields(q);
         $("#details-modal").modal();
       }
 
-      function postQueue(queue) {
-        $.ajax({
-          type: 'POST',
-          url: '/queues/',
-          data: JSON.stringify(queue),
-          contentType: "application/json",
-          dataType: 'json'
+      function saveQueue() {
+        var ns = $("#selectQueueType").val();
+        var max_concurrent = $("#inputQueueMaxConcurrent").val();
+        var frequency_seconds = $("#inputQueueFrequency").val();
+        var batch_size = $("#inputQueueBatchSize").val();
+        var batch_separator = $("#inputQueueBatchSeparator").val();
+        var id = $("#inputQueuePrefix").val();
+        var q = {
+          'name': $("#inputQueueName").val(),
+          'type': $("#selectQueueType").val()
+        };
+        if(max_concurrent.length) { q['max_concurrent'] = parseInt(max_concurrent) }
+        if(frequency_seconds.length) { q['frequency_seconds'] = parseInt(frequency_seconds) }
+        if(batch_size.length) { q['batch_size'] = parseInt(batch_size) }
+        if(batch_separator.length) { q['batch_separator'] = batch_separator }
+        q[ns] = {};
+        $("#detailsModalQueueSpecifics input").each(function(){
+          if($(this).val().length) {
+            var val = $(this).val();
+            if($(this).attr('type') == 'number') {
+              val = parseInt(val);
+            }
+            q[ns][$(this).attr('id').split('_')[1]] = val;
+          }
         });
+        var t = getTaskModalFields();
+        t['queue'] = q;
+        if(id.length) {
+          t.id = id;
+        }
+        postQueue(latest_queue_id,t);
+        $("#details-modal").modal('hide');
       }
 
+      function postQueue(id, queue) {
+        var url = '/queues/';
+        if(id) {
+          url += id + '/';
+        }
+        $.ajax({
+          type: 'POST',
+          url: url,
+          data: JSON.stringify(queue),
+          contentType: "application/json",
+          dataType: 'json',
+          error: function(data) {
+            $("#details-modal-error").text(data);
+          },
+          success: function(data) {
+            if(data['error']) {
+              $("#details-modal-error").text(data['error']);
+            }
+          }
+        });
+      }
 
 
       $( document ).ready(function() {
@@ -295,6 +428,10 @@
 ;          })
         })();
 
+        $("#selectQueueType").change(function(){
+          loadQueueSpecifics(findQueue(latest_queue_id),$("#selectQueueType").val());
+        });
+
 
         $('.dataTables_filter input[type="search"]').css({'width':'300px','display':'inline-block','font-size':'1.3em','height':'36px'}).
           parent().css({'float':'left'});
@@ -324,7 +461,7 @@
         <div role="tabpanel" class="tab-pane" id="tasks">
           <div class="row" style="padding:10px;">
             <div class="col-xs-12">
-              <a href="#" class="add-task-btn btn btn-primary pull-right">Add Task <span class="glyphicon glyphicon-plus"></span></a>
+              <a href="#" onclick="taskDetails(null,this);return false;" class="add-task-btn btn btn-primary pull-right">Add Task <span class="glyphicon glyphicon-plus"></span></a>
               <table id="tasks_table" class="table table-bordered table-condensed">
                 <thead>
                   <tr>
@@ -344,7 +481,7 @@
         <div role="tabpanel" class="tab-pane active" id="queues">
           <div class="row" style="padding:10px;">
             <div class="col-xs-12">
-              <a href="#" class="add-queue-btn btn btn-primary pull-right">Add Queue <span class="glyphicon glyphicon-plus"></span></a>
+              <a href="#" onclick="queueDetails(null,this);return false;" class="add-queue-btn btn btn-primary pull-right">Add Queue <span class="glyphicon glyphicon-plus"></span></a>
               <table id="queues_table" class="table table-bordered table-condensed">
                 <thead>
                   <tr>
@@ -377,95 +514,139 @@
           </div>
           <div class="modal-body">
             <form role="form">
-              <div id="detailsModalQueueInfo" class="qm-widget">
-                <div class="row">
-                  <div class="form-group col-xs-4">
-                    <label>Queue Type</label>
-                    <select class="form-control" id="selectQueueType">
-                    </select>
+              <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+                <div class="panel panel-default qm-widget">
+                  <div class="panel-heading" role="tab" id="headingOne">
+                    <h4 class="panel-title">
+                      <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseQueueSettings" aria-expanded="true" aria-controls="collapseOne">
+                        General Queue Settings
+                      </a>
+                    </h4>
                   </div>
-                  <div class="form-group col-xs-4">
-                    <label>Name</label>
-                    <input id="inputQueueName" type="text" class="form-control" />
-                  </div>
-                  <div class="form-group col-xs-4">
-                    <label>Task Prefix</label>
-                    <input id="inputQueuePrefix" type="text" class="form-control" />
-                  </div>
-                </div>
+                  <div id="collapseQueueSettings" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingOne">
+                    <div class="panel-body">
+                      <div id="detailsModalQueueInfo">
+                        <div class="row">
+                          <div class="form-group col-xs-4">
+                            <label>Queue Type</label>
+                            <select class="form-control" id="selectQueueType">
+                            </select>
+                          </div>
+                          <div class="form-group col-xs-4">
+                            <label>Name</label>
+                            <input id="inputQueueName" type="text" class="form-control" />
+                          </div>
+                          <div class="form-group col-xs-4">
+                            <label>Task Prefix</label>
+                            <input id="inputQueuePrefix" type="text" class="form-control" />
+                          </div>
+                        </div>
 
-                <div class="row">
-                  <div class="form-group col-xs-6">
-                    <label>Max Concurrent Tasks</label>
-                    <input id="inputQueueMaxConcurrent" type="number" class="form-control" />
-                  </div>
-                  <div class="form-group col-xs-6">
-                    <label>Polling Frequency Seconds</label>
-                    <input id="inputQueueFrequency" type="number" class="form-control" />
+                        <div class="row">
+                          <div class="form-group col-xs-6">
+                            <label>Max Concurrent Tasks</label>
+                            <input id="inputQueueMaxConcurrent" type="number" class="form-control" />
+                          </div>
+                          <div class="form-group col-xs-6">
+                            <label>Polling Frequency Seconds</label>
+                            <input id="inputQueueFrequency" type="number" class="form-control" placholder="1" />
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="form-group col-xs-6">
+                            <label>Batch Size</label>
+                            <input id="inputQueueBatchSize" type="number" class="form-control" placeholder="0" />
+                          </div>
+                          <div class="form-group col-xs-6">
+                            <label>Batch Seperator</label>
+                            <input id="inputQueueBatchSeparator" type="text" class="form-control" placeholder="|" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="row">
-                  <div class="form-group col-xs-6">
-                    <label>Batch Size</label>
-                    <input id="inputQueueBatchSize" type="number" class="form-control" placeholder="0" />
+                <div class="panel panel-default qm-widget">
+                  <div class="panel-heading" role="tab" id="headingTwo">
+                    <h4 class="panel-title">
+                      <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseQueueSpecifics" aria-expanded="true" aria-controls="collapseTwo">
+                        <span id="queueSpecificsHeading"></span>
+                      </a>
+                    </h4>
                   </div>
-                  <div class="form-group col-xs-6">
-                    <label>Batch Seperator</label>
-                    <input id="inputQueueBatchSeparator" type="text" class="form-control" placeholder="|" />
+                  <div id="collapseQueueSpecifics" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingTwo">
+                    <div class="panel-body">
+                      <div id="detailsModalQueueSpecifics" class="qm-widget">
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel panel-default">
+                  <div class="panel-heading" role="tab" id="headingThree">
+                    <h4 class="panel-title">
+                      <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseTaskSettings" aria-expanded="false" aria-controls="collapseThree">
+                        Task Settings
+                      </a>
+                    </h4>
+                  </div>
+                  <div id="collapseTaskSettings" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingThree">
+                    <div class="panel-body">
+                      <div class="row tm-widget">
+                        <div class="form-group col-xs-4">
+                          <label>Id Prefix</label>
+                          <input id="inputTaskPrefix" type="text" class="form-control" />
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="form-group col-xs-6">
+                          <label>Image</label>
+                          <input id="inputDockerImage" type="text" class="form-control" />
+                          <span style="font-size:0.8em;font-style:italic;">Path to docker image and tag</span>
+                        </div>
+                        <div class="form-group col-xs-6">
+                          <label>Command</label>
+                          <input id="inputCommand" type="text" class="form-control" />
+                          <span style="font-size:0.8em;font-style:italic;">Command to run in the container</span>
+                        </div>
+                      </div>
+
+                      <div class="row">
+                        <div class="form-group col-xs-6">
+                          <label>Memory</label>
+                          <input id="inputMem" type="number" class="form-control" />
+                          <span style="font-size:0.8em;font-style:italic;">RAM to allocate to container</span>
+                        </div>
+                        <div class="form-group col-xs-6">
+                          <label>CPU</label>
+                          <input id="inputCpu" type="number" class="form-control" />
+                          <span style="font-size:0.8em;font-style:italic;">CPU priority to allocate to container</span>
+                        </div>
+                      </div>
+
+                      <div class="row">
+                        <div class="form-group col-xs-12">
+                          <label>Environment Variables</label>
+                          <textarea id="textEnv" class="form-control" style="white-space:pre;" rows="3"></textarea>
+                          <span style="font-size:0.8em;font-style:italic;">
+                            Format is "VARNAME=VARVALUE", separate multiple variables with newlines
+                          </span>
+                        </div>
+                      </div>
+
+                      <div class="row">
+                        <div class="form-group col-xs-12">
+                          <label>Volumes</label>
+                          <textarea id="textVolume" class="form-control" style="white-space:pre;" rows="3"></textarea>
+                          <span style="font-size:0.8em;font-style:italic;">
+                            Format is "host/path:container/path", separate multiple mounts with newlines
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-
-              <div id="detailsModalQueueSpecifics" class="qm-widget">
-
-              </div>
-
-              <div class="row">
-                <div class="form-group col-xs-6">
-                  <label>Image</label>
-                  <input id="inputDockerImage" type="text" class="form-control" />
-                  <span style="font-size:0.8em;font-style:italic;">Path to docker image and tag</span>
-                </div>
-                <div class="form-group col-xs-6">
-                  <label>Command</label>
-                  <input id="inputCommand" type="text" class="form-control" />
-                  <span style="font-size:0.8em;font-style:italic;">Command to run in the container</span>
-                </div>
-              </div>
-
-              <div class="row">
-                <div class="form-group col-xs-6">
-                  <label>Memory</label>
-                  <input id="inputMem" type="number" class="form-control" />
-                  <span style="font-size:0.8em;font-style:italic;">RAM to allocate to container</span>
-                </div>
-                <div class="form-group col-xs-6">
-                  <label>CPU</label>
-                  <input id="inputCpu" type="number" class="form-control" />
-                  <span style="font-size:0.8em;font-style:italic;">CPU priority to allocate to container</span>
-                </div>
-              </div>
-
-              <div class="row">
-                <div class="form-group col-xs-12">
-                  <label>Environment Variables</label>
-                  <textarea id="textEnv" class="form-control" style="white-space:pre;" rows="3"></textarea>
-                  <span style="font-size:0.8em;font-style:italic;">
-                    Format is "VARNAME=VARVALUE", separate multiple variables with newlines
-                  </span>
-                </div>
-              </div>
-
-              <div class="row">
-                <div class="form-group col-xs-12">
-                  <label>Volumes</label>
-                  <textarea id="textVolume" class="form-control" style="white-space:pre;" rows="3"></textarea>
-                  <span style="font-size:0.8em;font-style:italic;">
-                    Format is "host/path:container/path", separate multiple mounts with newlines
-                  </span>
-                </div>
-              </div>
-
             </form>
             <div id="details-modal-error" class="callout callout-danger" style="display:none;margin-bottom:0px;">
 
@@ -473,8 +654,8 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-default pull-left" data-dismiss="modal">Cancel</button>
-            <button id="runTaskBtn" type="button" class="btn btn-primary tm-widget" data-loading-text="Starting...">Run Task</button>
-            <button id="saveQueueBtn" type="button" class="btn btn-primary qm-widget" data-loading-text="Saving...">Save</button>
+            <button id="runTaskBtn" type="button" onclick="runTask();return false;" class="btn btn-primary tm-widget" data-loading-text="Starting...">Run Task</button>
+            <button id="saveQueueBtn" type="button" onclick="saveQueue();return false;" class="btn btn-primary qm-widget" data-loading-text="Saving...">Save</button>
           </div>
         </div><!-- /.modal-content -->
       </div><!-- /.modal-dialog -->

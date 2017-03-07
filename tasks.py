@@ -29,6 +29,7 @@ class HippoTask(object):
             else:
                 self.mesos_id = self.definition.get('id','hippo') + '.' + str(uuid.uuid4())
                 self.definition['mesos_id'] = self.mesos_id
+                self.definition['mesos_state'] = 'WAITING_ON_OFFERS'
                 self.save()
 
     @classmethod
