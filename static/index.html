@@ -262,7 +262,7 @@
             if($(this).attr('type') == 'number') {
               val = parseInt(val);
             }
-            q[ns][$(this).attr('id').split('_')[1]] = val;
+            q[ns][$(this).attr('id').split('_').slice(1).join('_')] = val;
           }
         });
         var t = getTaskModalFields();
@@ -546,11 +546,11 @@
                         <div class="row">
                           <div class="form-group col-xs-6">
                             <label>Max Concurrent Tasks</label>
-                            <input id="inputQueueMaxConcurrent" type="number" class="form-control" />
+                            <input id="inputQueueMaxConcurrent" type="number" class="form-control" placeholder="10" />
                           </div>
                           <div class="form-group col-xs-6">
                             <label>Polling Frequency Seconds</label>
-                            <input id="inputQueueFrequency" type="number" class="form-control" placholder="1" />
+                            <input id="inputQueueFrequency" type="number" class="form-control" placeholder="60" />
                           </div>
                         </div>
                         <div class="row">

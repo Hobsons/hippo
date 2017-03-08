@@ -145,7 +145,7 @@ class HippoTask(object):
         return self.definition.get('mem',256)
 
     def max_concurrent(self):
-        return self.definition.get('max_concurrent',10000)
+        return self.definition.get('max_concurrent',10)
 
     def constraints_ok(self,offer):
         offer_attributes = {}
