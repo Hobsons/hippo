@@ -21,10 +21,13 @@ def reconcile(driver, redis_client):
         # give time for driver to connect first
         time.sleep(5)
         while True:
-            running_task_ids = [dict(task_id={'value':t.mesos_id}) for t in HippoTask.working_tasks(redis_client)]
-            if running_task_ids:
-                logging.info('Reconciling %d tasks' % len(running_task_ids))
-                driver.reconcileTasks(running_task_ids)
+            try:
+                running_task_ids = [dict(task_id={'value':t.mesos_id}) for t in HippoTask.working_tasks(redis_client)]
+                if running_task_ids:
+                    logging.info('Reconciling %d tasks' % len(running_task_ids))
+                    driver.reconcileTasks(running_task_ids)
+            except redis.exceptions.ConnectionError:
+                logging.warning('Redis Connection Error in Reconcile Thread')
             time.sleep(60 * 15)
     t = Thread(target=_rcile,args=(),daemon=True)
     t.start()
@@ -35,11 +38,14 @@ def kill_task(driver, redis_client):
     # check for tasks to kill every 2 seconds
     def _kt():
         while True:
-            kill_tasks = HippoTask.kill_tasks(redis_client)
-            for t in kill_tasks:
-                logging.info('Killing task %s' % t.mesos_id)
-                driver.killTask({'value':t.mesos_id})
-                t.kill_complete()
+            try:
+                kill_tasks = HippoTask.kill_tasks(redis_client)
+                for t in kill_tasks:
+                    logging.info('Killing task %s' % t.mesos_id)
+                    driver.killTask({'value':t.mesos_id})
+                    t.kill_complete()
+            except redis.exceptions.ConnectionError:
+                logging.warning('Redis Connection Error in Kill Task Thread')
             time.sleep(2)
     t = Thread(target=_kt,args=(),daemon=True)
     t.start()
@@ -47,7 +53,7 @@ def kill_task(driver, redis_client):
 
 
 def leader():
-    logging.debug('Elected as leader, starting work...')
+    logging.info('Elected as leader, starting work...')
 
     redis_client = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB, password=config.REDIS_PW)
 
@@ -99,13 +105,13 @@ def leader():
         # main thread just sleeps as long as all the child threads are still running
         time.sleep(1)
 
-    logging.debug('...Exiting')
+    logging.info('...Exiting')
     exit(0)
 
 
 if __name__ == '__main__':
 
-    logging.basicConfig(level=logging.DEBUG,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    logging.basicConfig(level=logging.INFO,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
     incomplete_config = False
     if not config.REDIS_HOST:
@@ -123,6 +129,6 @@ if __name__ == '__main__':
         hostname = os.getenv('HOST',socket.gethostname())
 
         leader_election = Election(zk,'hippoleader',hostname)
-        logging.debug('Contending to be the hippo leader...')
-        logging.debug('contenders: ' + str(leader_election.contenders()))
+        logging.info('Contending to be the hippo leader...')
+        logging.info('contenders: ' + str(leader_election.contenders()))
         leader_election.run(leader)

@@ -1,6 +1,8 @@
 import time
 import copy
 import base64
+import logging
+import redis
 
 
 class HippoDataSource(object):
@@ -9,8 +11,8 @@ class HippoDataSource(object):
         self.hippo_redis = hippo_redis
         self.working_count = working_count
         self.definition = copy.copy(self.hippo_queue.definition)
-        self.last_run_tstamp = self.definition['queue'].get('last_run_tstamp')
-        self.frequency_seconds = self.definition['queue'].get('frequency_seconds',1)
+        self.last_run_tstamp = self.definition.get('last_run_tstamp')
+        self.frequency_seconds = self.definition['queue'].get('frequency_seconds',60)
         self.max_concurrent = self.definition['queue'].get('max_concurrent',self.definition.get('max_concurrent',10000))
         self.batch_size = self.definition['queue'].get('batch_size',1)
         self.batch_separator = self.definition['queue'].get('batch_separator','|')
@@ -33,9 +35,16 @@ class HippoDataSource(object):
         pass
 
     def process_source(self):
-        self.process()
+        try:
+            self.process()
+        except Exception as e:
+            logging.warning('Error processing queue data source')
+            logging.warning(e)
         self.hippo_queue.definition['last_run_tstamp'] = int(time.time())
-        self.hippo_queue.save()
+        try:
+            self.hippo_queue.save()
+        except redis.exceptions.ConnectionError:
+            logging.warning('Redis Connection Error in Queue Worker Thread')
 
     def create_tasks(self, items):
         chunks = [items[i:i + self.batch_size] for i in range(0, len(items), self.batch_size)]

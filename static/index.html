@@ -53,7 +53,6 @@
       function runTask() {
         var t = getTaskModalFields();
         postTask(t);
-        $("#details-modal").modal('hide');
       }
 
       function loadTaskModalFields(t) {
@@ -118,7 +117,7 @@
         $(".qm-widget").hide();
         $("#collapseTaskSettings").collapse('show');
         loadTaskModalFields(findTask(id));
-        $("#details-modal-error").text("");
+        $("#details-modal-error").text("").hide();
         $("#details-modal").modal();
       }
 
@@ -130,11 +129,13 @@
           contentType: "application/json",
           dataType: 'json',
           error: function(data) {
-            $("#details-modal-error").text(data);
+            $("#details-modal-error").text(data.responseText).show();
           },
           success: function(data) {
             if(data['error']) {
-              $("#details-modal-error").text(data['error']);
+              $("#details-modal-error").text(data['error']).show();
+            } else {
+              $("#details-modal").modal('hide');
             }
           }
         });
@@ -221,7 +222,7 @@
         $("#collapseTaskSettings").collapse('hide');
         $("#collapseQueueSettings").collapse('show');
         $("#collapseQueueSpecifics").collapse('hide');
-        $("#details-modal-error").text("");
+        $("#details-modal-error").text("").hide();
         latest_queue_id = id;
         var q = {};
         if(id) {
@@ -233,10 +234,9 @@
           $("#inputQueueName").val(q['queue']['name']);
           $("#selectQueueType").val(q['queue']['type']);
           $("#inputQueuePrefix").val(id);
+          loadTaskModalFields(q);
         }
-
-        loadQueueSpecifics(q,'redis');
-        loadTaskModalFields(q);
+        $("#selectQueueType").change();
         $("#details-modal").modal();
       }
 
@@ -271,7 +271,6 @@
           t.id = id;
         }
         postQueue(latest_queue_id,t);
-        $("#details-modal").modal('hide');
       }
 
       function postQueue(id, queue) {
@@ -286,11 +285,13 @@
           contentType: "application/json",
           dataType: 'json',
           error: function(data) {
-            $("#details-modal-error").text(data);
+            $("#details-modal-error").text(data.responseText).show();
           },
           success: function(data) {
             if(data['error']) {
-              $("#details-modal-error").text(data['error']);
+              $("#details-modal-error").text(data['error']).show();
+            } else {
+              $("#details-modal").modal('hide');
             }
           }
         });
@@ -648,7 +649,7 @@
                 </div>
               </div>
             </form>
-            <div id="details-modal-error" class="callout callout-danger" style="display:none;margin-bottom:0px;">
+            <div id="details-modal-error" class="callout callout-danger bg-danger" style="display:none;margin-bottom:0px;">
 
             </div>
           </div>

@@ -176,7 +176,7 @@ class HippoTask(object):
         d.command.value = self.definition['cmd']
         if self.definition.get('env'):
             d.command.environment.variables = [
-                dict(name=e[1],value=e[2]) for e in self.definition['env'].items()
+                dict(name=e[0],value=e[1]) for e in self.definition['env'].items()
             ]
         d.container.type='DOCKER'
         d.container.docker.image=self.definition['container']['docker']['image']
@@ -205,7 +205,8 @@ MESOS_FINAL_STATES = MESOS_TASK_ERRORS + MESOS_SYSTEM_ERRORS + ['TASK_FINISHED']
 TASK_SCHEMA = {
     "id": {
         "type":"string",
-        "required":True
+        "required":True,
+        "empty": False
     },
     "container": {
         "type": "dict",
@@ -217,7 +218,8 @@ TASK_SCHEMA = {
                 "schema": {
                     "image" : {
                         "type":"string",
-                        "required":True
+                        "required":True,
+                        "empty": False
                     },
                     "network": {
                         "type":"string",

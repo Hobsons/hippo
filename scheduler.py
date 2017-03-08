@@ -1,4 +1,5 @@
 import time
+import redis
 import logging
 from pymesos import Scheduler, encode_data
 from tasks import HippoTask
@@ -11,10 +12,16 @@ class HippoScheduler(Scheduler):
     def resourceOffers(self, driver, offers):
         filters = {'refuse_seconds': 5}
 
-        working_count_by_id = HippoTask.working_task_count_by_id(self.redis)
+        try:
+            working_count_by_id = HippoTask.working_task_count_by_id(self.redis)
 
-        waiting_tasks = HippoTask.waiting_tasks(self.redis)
-        waiting_tasks.reverse()
+            waiting_tasks = HippoTask.waiting_tasks(self.redis)
+            waiting_tasks.reverse()
+        except redis.exceptions.ConnectionError:
+            logging.warning('Redis Connection Error in Scheduler resourceOffers')
+            for offer in offers:
+                driver.launchTasks(offer.id, [], filters)
+            return
 
         waiting_tasks = [t for t in waiting_tasks if t.max_concurrent() > working_count_by_id.get(t.definition_id(),0)]
 
@@ -47,14 +54,17 @@ class HippoScheduler(Scheduler):
         return 0.0
 
     def statusUpdate(self, driver, update):
-        t = HippoTask(mesos_id=update.task_id.value,redis_client=self.redis)
-        t.definition['mesos_state'] = update.state
-        t.save()
-        if update.state in ['TASK_FINISHED','TASK_FAILED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
-                            'TASK_KILLED','TASK_UNREACHABLE','TASK_GONE','TASK_GONE_BY_OPERATOR']:
-            t.finish()
-        if update.state != 'TASK_FINISHED':
-            t.retry()
-        logging.debug('Status update TID %s %s',
+        try:
+            t = HippoTask(mesos_id=update.task_id.value,redis_client=self.redis)
+            t.definition['mesos_state'] = update.state
+            t.save()
+            if update.state in ['TASK_FINISHED','TASK_FAILED','TASK_LOST','TASK_ERROR','TASK_DROPPED',
+                                'TASK_KILLED','TASK_UNREACHABLE','TASK_GONE','TASK_GONE_BY_OPERATOR']:
+                t.finish()
+            if update.state != 'TASK_FINISHED':
+                t.retry()
+        except redis.exceptions.ConnectionError:
+            logging.warning('Redis Connection Error in Scheduler statusUpdate')
+        logging.info('Status update TID %s %s',
                       update.task_id.value,
                       update.state)

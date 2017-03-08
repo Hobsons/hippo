@@ -63,6 +63,7 @@ def queues():
         q = HippoQueue(definition=data,redis_client=app.redis)
         validation_error = q.validate()
         if validation_error:
+            q.delete()
             return jsonify({"error":validation_error}), 400
         return jsonify({"id":q.id})
     else:
