@@ -68,3 +68,10 @@ class HippoScheduler(Scheduler):
         logging.info('Status update TID %s %s',
                       update.task_id.value,
                       update.state)
+
+    def error(self, driver, message):
+        logging.warning('MESOS Error: ' + message)
+        if message == 'Framework has been removed':
+            logging.warning('Clearing Saved Framework ID and Dying!')
+            self.redis.delete('hippo:saved_framework_id')
+            exit()

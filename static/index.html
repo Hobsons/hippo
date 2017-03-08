@@ -61,6 +61,8 @@
           $("#inputCommand").val(t.cmd);
           $("#inputCpu").val(t.cpus);
           $("#inputMem").val(t.mem);
+          $("#inputTaskRetries").val(t.task_retries);
+          $("#inputSystemRetries").val(t.system_retries);
           $("#inputTaskPrefix").val(t.id);
           var env_str = '';
           if(t.env) {
@@ -98,6 +100,8 @@
             });
           }
         }
+        var task_retries = $("#inputTaskRetries").val();
+        var system_retries = $("#inputSystemRetries").val();
         var t = {
           'container': { 'docker': {'image': $("#inputDockerImage").val() }},
           'cpus': parseFloat($("#inputCpu").val()),
@@ -108,6 +112,12 @@
         };
         if(volumes.length) {
           t['container']['volumes'] = volumes;
+        }
+        if(system_retries.length) {
+          t['system_retries'] = parseInt(system_retries)
+        }
+        if(task_retries.length) {
+          t['task_retries'] = parseInt(task_retries)
         }
         return t;
       }
@@ -622,6 +632,17 @@
                           <label>CPU</label>
                           <input id="inputCpu" type="number" class="form-control" />
                           <span style="font-size:0.8em;font-style:italic;">CPU priority to allocate to container</span>
+                        </div>
+                      </div>
+
+                      <div class="row">
+                        <div class="form-group col-xs-6">
+                          <label>Task Failure Retries</label>
+                          <input id="inputTaskRetries" type="number" class="form-control" placeholder="0" />
+                        </div>
+                        <div class="form-group col-xs-6">
+                          <label>Hippo System Failure Retries</label>
+                          <input id="inputSystemRetries" type="number" class="form-control" placeholder="2" />
                         </div>
                       </div>
 

@@ -51,7 +51,7 @@ class HippoDataSource(object):
         for batch in chunks:
             data = self.batch_separator.join([s.decode() if not isinstance(s,str) else s for s in batch])
             b64data = base64.b64encode(data.encode()).decode()
-            task_def = copy.copy(self.definition)
+            task_def = copy.deepcopy(self.definition)
             del task_def['queue']
             task_def['max_concurrent'] = self.max_concurrent
             task_def['cmd'] = task_def['cmd'].replace('$HIPPO_DATA_BASE64',b64data).replace('$HIPPO_DATA',data)

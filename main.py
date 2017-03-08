@@ -57,10 +57,17 @@ def leader():
 
     redis_client = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB, password=config.REDIS_PW)
 
+    saved_framework_id = redis_client.get('hippo:saved_framework_id')
+
     framework = Dict()
     framework.user = 'root'
     framework.name = "Hippo"
     framework.hostname = os.getenv('HOST',socket.gethostname())
+    framework.checkpoint = True
+    framework.failover_timeout = 86400.0
+    if saved_framework_id:
+        framework.id = {"value":saved_framework_id.decode()}
+
 
     driver = MesosSchedulerDriver(
         HippoScheduler(redis_client),
@@ -104,6 +111,12 @@ def leader():
           process_queue_thread.is_alive():
         # main thread just sleeps as long as all the child threads are still running
         time.sleep(1)
+
+        # if registered and not using a saved framework id, save this one
+        if driver.framework_id and not saved_framework_id:
+            saved_framework_id = driver.framework_id
+            redis_client.set('hippo:saved_framework_id',saved_framework_id)
+            logging.info('saving framework id ' + driver.framework_id)
 
     logging.info('...Exiting')
     exit(0)
