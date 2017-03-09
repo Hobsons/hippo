@@ -18,7 +18,7 @@ class S3Bucket(HippoDataSource):
         super().__init__(*args, namespace=S3Bucket.namespace, inputs=S3Bucket.inputs)
 
     def process(self):
-        if not self.awskey or not self.bucket_name or not self.awssecret:
+        if not self.awskey or not self.bucket_name or not self.awssecret or self.new_task_limit < 1:
             return
 
         session = boto3.Session(aws_access_key_id = self.awskey,
@@ -26,14 +26,17 @@ class S3Bucket(HippoDataSource):
                           region_name = self.awsregion)
 
         s3 = session.resource('s3')
-        queue = sqs.get_queue_by_name(QueueName=self.queuename)
+        bucket = s3.Bucket(self.bucket_name)
 
-        max_msg = min(self.new_task_limit,10)
-        if max_msg > 0:
-            messages = queue.receive_messages(MaxNumberOfMessages=max_msg)
+        key_tstamp_tuples = []
+        for key in bucket.objects.all():
+            tstamp = key.last_modified.timestamp()
+            if not self.earliest_unix_tstamp or int(self.earliest_unix_tstamp) < tstamp:
+                key_tstamp_tuples.append((key.key,tstamp))
 
-            if messages:
-                self.create_tasks([m.body for m in messages])
+        if key_tstamp_tuples:
+            key_tstamp_tuples.sort(key=lambda x: x[1])
+            key_tstamp_tuples = key_tstamp_tuples[:self.new_task_limit]
+            self.create_tasks([kt[0] for kt in key_tstamp_tuples])
+            self.hippo_queue.definition['queue'][self.namespace]['earliest_unix_tstamp'] = key_tstamp_tuples[-1][1]
 
-            for m in messages:
-                m.delete()
