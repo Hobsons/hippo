@@ -43,6 +43,8 @@ class HippoTask(object):
         result_objects = []
         for tstr in results:
             if tstr:
+                if isinstance(tstr,bytes):
+                    tstr = tstr.decode()
                 result_objects.append(cls(definition=json.loads(tstr),redis_client=redis_client))
         return result_objects
 
@@ -97,6 +99,8 @@ class HippoTask(object):
         if not body:
             self.definition = {}
         else:
+            if isinstance(body,bytes):
+                body = body.decode()
             self.definition = json.loads(body)
 
     def save(self):

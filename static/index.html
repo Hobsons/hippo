@@ -388,8 +388,8 @@
                 state_color = 'text-danger';
               }
               var dt_format = '';
-              if(q.last_run_tstamp) {
-                var dt = new Date(q.last_run_tstamp * 1000);
+              if(q.queue.last_run_tstamp) {
+                var dt = new Date(q.queue.last_run_tstamp * 1000);
                 dt_format = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString();
               }
               var details_btn_html = `<button class="btn btn-xs btn-info btn-row" onclick="queueDetails('${q.id}',this)">

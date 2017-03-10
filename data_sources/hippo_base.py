@@ -11,7 +11,7 @@ class HippoDataSource(object):
         self.hippo_redis = hippo_redis
         self.working_count = working_count
         self.definition = copy.copy(self.hippo_queue.definition)
-        self.last_run_tstamp = self.definition.get('last_run_tstamp')
+        self.last_run_tstamp = self.definition['queue'].get('last_run_tstamp')
         self.frequency_seconds = self.definition['queue'].get('frequency_seconds',60)
         self.max_concurrent = self.definition['queue'].get('max_concurrent',self.definition.get('max_concurrent',10000))
         self.batch_size = self.definition['queue'].get('batch_size',1)
@@ -29,6 +29,7 @@ class HippoDataSource(object):
         cur_tstamp = int(time.time())
         if self.last_run_tstamp and cur_tstamp < self.last_run_tstamp + self.frequency_seconds:
             return True
+        return False
 
     def process(self):
         # stub, this should be implemented by child classes
@@ -40,7 +41,7 @@ class HippoDataSource(object):
         except Exception as e:
             logging.warning('Error processing queue data source')
             logging.warning(e)
-        self.hippo_queue.definition['last_run_tstamp'] = int(time.time())
+        self.hippo_queue.definition['queue']['last_run_tstamp'] = int(time.time())
         try:
             self.hippo_queue.save()
         except redis.exceptions.ConnectionError:

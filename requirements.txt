@@ -1,8 +1,13 @@
-kazoo
-pymesos
-cerberus
 addict
-redis
+boto3
+cerberus
 fakeredis
+flask
+kazoo
+mock
 psycopg2
+pymesos
+redis
+
+
 

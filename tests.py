@@ -112,7 +112,7 @@ class TestQueue(unittest.TestCase):
         HippoQueue.__stop_processing=True
 
     def test_validate(self):
-        q = HippoQueue(definition={'id':'foo','queue':{'name':'fooname'}},redis_client=self.redis_client)
+        q = HippoQueue(definition={'id':'foo','queue':{'name':'fooname','type':'footype'}},redis_client=self.redis_client)
         errors = q.validate()
         self.assertIsNotNone(errors)
         q.definition = {'mem': 32, 'cmd': "echo 'foo'", 'container': {'docker': {'image': 'busybox:latest'}},
@@ -130,7 +130,7 @@ class TestHippoBase(unittest.TestCase):
 
     def test_hippodatasource(self):
         q = HippoQueue(definition={'id':'foo','cmd':'echo $HIPPO_DATA','env':{'foo':'$HIPPO_DATA_BASE64'},
-                                   'queue':{'name':'fooname','last_run_tstamp':time.time()}},
+                                   'queue':{'name':'fooname','last_run_tstamp':time.time(),'frequency_seconds':1}},
                        redis_client=self.redis_client)
 
         hds = HippoDataSource(q,0,HippoTask,self.redis_client)

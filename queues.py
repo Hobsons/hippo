@@ -44,6 +44,8 @@ class HippoQueue(object):
         result_objects = []
         for qstr in results:
             if qstr:
+                if isinstance(qstr,bytes):
+                    qstr = qstr.decode()
                 result_objects.append(cls(definition=json.loads(qstr),redis_client=redis_client))
         return result_objects
 
@@ -125,6 +127,8 @@ class HippoQueue(object):
         if not body:
             self.definition = {}
         else:
+            if isinstance(body,bytes):
+                body = body.decode()
             self.definition = json.loads(body)
 
     def is_enabled(self):
