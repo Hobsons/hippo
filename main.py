@@ -145,3 +145,5 @@ if __name__ == '__main__':
         logging.info('Contending to be the hippo leader...')
         logging.info('contenders: ' + str(leader_election.contenders()))
         leader_election.run(leader)
+
+    logging.info('Exiting main thread!')
