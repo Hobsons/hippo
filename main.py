@@ -137,13 +137,24 @@ if __name__ == '__main__':
 
     if not incomplete_config:
         zk = KazooClient(hosts=config.ZK_URI.replace('zk://','').replace('/mesos',''))
+        leader_election = None
+
+        def zk_listen(state):
+            from kazoo.protocol.states import KazooState
+            logging.info('zkstate '+ str(state))
+            global leader_election
+            if state in [KazooState.SUSPENDED, KazooState.LOST] and leader_election is not None and not leader_election.lock.is_acquired:
+                logging.info('lost zk connection while waiting to be leader, exiting')
+                leader_election.cancel()
+
+        zk.add_listener(zk_listen)
         zk.start()
 
         hostname = os.getenv('HOST',socket.gethostname())
-
         leader_election = Election(zk,'hippoleader',hostname)
         logging.info('Contending to be the hippo leader...')
         logging.info('contenders: ' + str(leader_election.contenders()))
+
         leader_election.run(leader)
 
     logging.info('Exiting main thread!')
