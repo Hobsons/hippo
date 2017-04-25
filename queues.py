@@ -26,6 +26,10 @@ class HippoQueue(object):
             self.definition['id'] = self.id
             if 'status' not in self.definition['queue']:
                 self.definition['queue']['status'] = 'ENABLED'
+            if 'env' in self.definition:
+                # fix any env vars that are passed in as numbers instead of strings
+                for v in self.definition['env']:
+                    self.definition['env'][v] = str(self.definition['env'][v])
             self.save()
             redis_id = 'hippo:queue:' + self.id
             if redis_id not in [i.decode() for i in redis_client.lrange('hippo:all_queueid_list',0,-1)]:

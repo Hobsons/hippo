@@ -30,6 +30,11 @@ class HippoTask(object):
                 self.mesos_id = self.definition.get('id','hippo') + '.' + str(uuid.uuid4())
                 self.definition['mesos_id'] = self.mesos_id
                 self.definition['mesos_state'] = 'WAITING_ON_OFFERS'
+                self.definition['mesos_agent'] = ''
+                if 'env' in self.definition:
+                    # fix any env vars that are passed in as numbers instead of strings
+                    for v in self.definition['env']:
+                        self.definition['env'][v] = str(self.definition['env'][v])
                 self.save()
 
     @classmethod
