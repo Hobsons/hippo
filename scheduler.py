@@ -27,7 +27,7 @@ class HippoScheduler(Scheduler):
         launched_ids = []
 
         logging.info("Got %d offers" % len(offers))
-        logging.info([o.get('attributes') for o in offers])
+        logging.info([o.hostname for o in offers])
 
         for offer in offers:
             cpus_available = self.getResource(offer.resources, 'cpus')
