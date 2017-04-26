@@ -26,8 +26,8 @@ class HippoScheduler(Scheduler):
         waiting_tasks = [t for t in waiting_tasks if t.max_concurrent() > working_count_by_id.get(t.definition_id(),0)]
         launched_ids = []
 
-        logging.info("Got %d offers" % len(offers))
-        logging.info([o.hostname for o in offers])
+        #logging.info("Got %d offers" % len(offers))
+        #logging.info([o.hostname for o in offers])
 
         for offer in offers:
             cpus_available = self.getResource(offer.resources, 'cpus')
