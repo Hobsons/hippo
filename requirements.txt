@@ -8,6 +8,6 @@ mock
 psycopg2
 pymesos
 redis
-
+cronex
 
 

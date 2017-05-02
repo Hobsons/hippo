@@ -12,6 +12,7 @@ class HippoDataSource(object):
         self.working_count = working_count
         self.definition = copy.copy(self.hippo_queue.definition)
         self.last_run_tstamp = self.definition['queue'].get('last_run_tstamp')
+        self.last_task_queued_tstamp = self.definition['queue'].get('last_task_queued_tstamp')
         self.frequency_seconds = self.definition['queue'].get('frequency_seconds',60)
         self.max_concurrent = self.definition['queue'].get('max_concurrent',self.definition.get('max_concurrent',10000))
         self.batch_size = self.definition['queue'].get('batch_size',1)
@@ -48,6 +49,8 @@ class HippoDataSource(object):
             logging.warning('Redis Connection Error in Queue Worker Thread')
 
     def create_tasks(self, items):
+        if items:
+            self.hippo_queue.definition['queue']['last_task_queued_tstamp'] = int(time.time())
         chunks = [items[i:i + self.batch_size] for i in range(0, len(items), self.batch_size)]
         for batch in chunks:
             data = self.batch_separator.join([s.decode() if not isinstance(s,str) else s for s in batch])
