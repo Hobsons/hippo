@@ -72,7 +72,7 @@ class HippoScheduler(Scheduler):
                     this_run_host_queue_count[offer.hostname] += 1
 
         for offer_id in matched_tasks_by_offer_id:
-            logging.info("Launching %d tasks on offer id %s, host %s" % (len(matched_tasks_by_offer_id[offer_id]),offer_id, host_by_offer_id['offer_id']))
+            logging.info("Launching %d tasks on offer id %s, host %s" % (len(matched_tasks_by_offer_id[offer_id]),offer_id, host_by_offer_id[offer_id]))
             driver.launchTasks({'value':offer_id}, matched_tasks_by_offer_id[offer_id], filters)
 
     def getResource(self, res, name):
