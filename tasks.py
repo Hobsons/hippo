@@ -6,6 +6,7 @@ import logging
 import config
 from addict import Dict
 from cerberus import Validator
+from aes import encrypt_str, decrypt_str
 
 
 class HippoTask(object):
@@ -50,7 +51,11 @@ class HippoTask(object):
             if tstr:
                 if isinstance(tstr,bytes):
                     tstr = tstr.decode()
-                result_objects.append(cls(definition=json.loads(tstr),redis_client=redis_client))
+                try:
+                    tobj = json.loads(decrypt_str(tstr))
+                except Exception:
+                    tobj = json.loads(tstr)
+                result_objects.append(cls(definition=tobj,redis_client=redis_client))
         return result_objects
 
     @classmethod
@@ -106,11 +111,14 @@ class HippoTask(object):
         else:
             if isinstance(body,bytes):
                 body = body.decode()
-            self.definition = json.loads(body)
+            try:
+                self.definition = json.loads(decrypt_str(body))
+            except Exception:
+                self.definition = json.loads(body)
 
     def save(self):
         self.definition['status_tstamp'] = time.time()
-        self.redis.set(self.mesos_id,json.dumps(self.definition))
+        self.redis.set(self.mesos_id,encrypt_str(json.dumps(self.definition)))
 
     def queue(self):
         self.redis.lpush('hippo:waiting_taskid_list',self.mesos_id)

@@ -10,6 +10,7 @@ from queue import Queue
 from cerberus import Validator
 from tasks import TASK_SCHEMA, HippoTask
 from data_sources import *
+from aes import encrypt_str, decrypt_str
 
 
 class HippoQueue(object):
@@ -50,7 +51,11 @@ class HippoQueue(object):
             if qstr:
                 if isinstance(qstr,bytes):
                     qstr = qstr.decode()
-                result_objects.append(cls(definition=json.loads(qstr),redis_client=redis_client))
+                try:
+                    qobj = json.loads(decrypt_str(qstr))
+                except Exception:
+                    qobj = json.loads(qstr)
+                result_objects.append(cls(definition=qobj,redis_client=redis_client))
         return result_objects
 
     @classmethod
@@ -124,7 +129,7 @@ class HippoQueue(object):
                 break
 
     def save(self):
-        self.redis.set('hippo:queue:' + self.id,json.dumps(self.definition))
+        self.redis.set('hippo:queue:' + self.id,encrypt_str(json.dumps(self.definition)))
 
     def load(self):
         body = self.redis.get('hippo:queue:' + self.id)
@@ -133,7 +138,10 @@ class HippoQueue(object):
         else:
             if isinstance(body,bytes):
                 body = body.decode()
-            self.definition = json.loads(body)
+            try:
+                self.definition = json.loads(decrypt_str(body))
+            except Exception:
+                self.definition = json.loads(body)
 
     def is_enabled(self):
         return 'status' not in self.definition['queue'] or self.definition['queue']['status'] == 'ENABLED'

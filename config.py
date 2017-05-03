@@ -1,4 +1,5 @@
 import os
+import hashlib
 
 REDIS_HOST = os.getenv('REDIS_HOST','127.0.0.1')
 if ':' in REDIS_HOST:
@@ -16,3 +17,6 @@ MESOS_HOST = os.getenv('MESOS_HOST')
 NUM_QUEUE_POLL_WORKERS = int(os.getenv('NUM_QUEUE_POLL_WORKERS',8))
 
 TASK_RETENTION_SECONDS = int(os.getenv('TASK_RETENTION_SECONDS',86400))
+
+AES_CIPHER_KEY = os.getenv('AES_CIPHER_KEY','SOMECIPHER99993u3nfnnslfeiwjf3rjj3jsnefjnw3f')
+HASHED_KEY = hashlib.sha256(AES_CIPHER_KEY.encode()).digest()
