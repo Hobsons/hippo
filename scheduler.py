@@ -70,6 +70,7 @@ class HippoScheduler(Scheduler):
                     used_mem_by_offer_id[offer.id.value] += task.mem()
                     this_run_host_queue_count.setdefault(offer.hostname,0)
                     this_run_host_queue_count[offer.hostname] += 1
+                    self.__log_recent_queue(offer.hostname)
 
         for offer_id in matched_tasks_by_offer_id:
             logging.info("Launching %d tasks on offer id %s, host %s" % (len(matched_tasks_by_offer_id[offer_id]),offer_id, host_by_offer_id[offer_id]))
