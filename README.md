@@ -201,6 +201,4 @@ the records for the actual mesos tasks that were triggered.  One-off tasks can a
 
 ## Architecture
 
-Hippo UI/API -> redis <- Hippo Workers <--> Mesos
-                                     \
-                                      -> Queue Data Sources
+Hippo UI/API -> redis <- Hippo Workers <--> Queue Data Sources and Mesos
