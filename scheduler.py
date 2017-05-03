@@ -66,7 +66,7 @@ class HippoScheduler(Scheduler):
                     used_cpu_by_offer_id[offer.id.value] += task.cpus()
                     used_mem_by_offer_id.setdefault(offer.id.value,0)
                     used_mem_by_offer_id[offer.id.value] += task.mem()
-                    this_run_host_queue_count.setdefault(offer.hostname)
+                    this_run_host_queue_count.setdefault(offer.hostname,0)
                     this_run_host_queue_count[offer.hostname] += 1
 
         for offer_id in matched_tasks_by_offer_id:
