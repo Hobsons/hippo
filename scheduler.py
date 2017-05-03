@@ -43,6 +43,7 @@ class HippoScheduler(Scheduler):
         used_cpu_by_offer_id = {}
         this_run_host_queue_count = {}
         matched_tasks_by_offer_id = {}
+        host_by_offer_id = {}
 
         offers = list(offers)
 
@@ -52,6 +53,7 @@ class HippoScheduler(Scheduler):
                 if this_run_host_queue_count.get(offer.hostname,0) > 1:
                     # don't launch more than two tasks per offer
                     continue
+                host_by_offer_id[offer.id.value] = offer.hostname
                 cpus_available = self.getResource(offer.resources, 'cpus') - used_cpu_by_offer_id.get(offer.id.value,0)
                 mem_available = self.getResource(offer.resources, 'mem') - used_mem_by_offer_id.get(offer.id.value,0)
                 if (task.cpus() <= cpus_available and
@@ -70,7 +72,7 @@ class HippoScheduler(Scheduler):
                     this_run_host_queue_count[offer.hostname] += 1
 
         for offer_id in matched_tasks_by_offer_id:
-            logging.info("Launching %d tasks on offer id %s" % (len(matched_tasks_by_offer_id[offer_id]),offer_id))
+            logging.info("Launching %d tasks on offer id %s, host %s" % (len(matched_tasks_by_offer_id[offer_id]),offer_id, host_by_offer_id['offer_id']))
             driver.launchTasks({'value':offer_id}, matched_tasks_by_offer_id[offer_id], filters)
 
     def getResource(self, res, name):
