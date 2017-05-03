@@ -49,7 +49,7 @@ class HippoScheduler(Scheduler):
         for task in waiting_tasks:
             offers.sort(key=lambda x:self.__get_recent_queue_count(x.hostname))
             for offer in offers:
-                if this_run_host_queue_count.get(offer.hostname) > 1:
+                if this_run_host_queue_count.get(offer.hostname,0) > 1:
                     # don't launch more than two tasks per offer
                     continue
                 cpus_available = self.getResource(offer.resources, 'cpus') - used_cpu_by_offer_id.get(offer.id,0)
