@@ -129,6 +129,8 @@ class HippoTask(object):
         pipe.lpush('hippo:working_taskid_list',self.mesos_id)
         pipe.lrem('hippo:waiting_taskid_list',0,self.mesos_id)
         pipe.execute()
+        self.definition['mesos_state'] = 'TASK_STAGING'
+        self.save()
 
     def finish(self):
         self.redis.lrem('hippo:working_taskid_list',0,self.mesos_id)
