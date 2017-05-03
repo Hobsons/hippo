@@ -9,5 +9,6 @@ psycopg2
 pymesos
 redis
 cronex
+pycrypto
 
 
