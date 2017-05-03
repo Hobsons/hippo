@@ -52,26 +52,26 @@ class HippoScheduler(Scheduler):
                 if this_run_host_queue_count.get(offer.hostname,0) > 1:
                     # don't launch more than two tasks per offer
                     continue
-                cpus_available = self.getResource(offer.resources, 'cpus') - used_cpu_by_offer_id.get(offer.id,0)
-                mem_available = self.getResource(offer.resources, 'mem') - used_mem_by_offer_id.get(offer.id,0)
+                cpus_available = self.getResource(offer.resources, 'cpus') - used_cpu_by_offer_id.get(offer.id.value,0)
+                mem_available = self.getResource(offer.resources, 'mem') - used_mem_by_offer_id.get(offer.id.value,0)
                 if (task.cpus() <= cpus_available and
                    task.mem() <= mem_available and
                    working_count_by_id.get(task.definition_id(),0) < task.max_concurrent() and
                    task.constraints_ok(offer)):
-                    matched_tasks_by_offer_id.setdefault(offer.id,[]).append(task.mesos_launch_definition(offer))
+                    matched_tasks_by_offer_id.setdefault(offer.id.value,[]).append(task.mesos_launch_definition(offer))
                     task.work()
                     working_count_by_id.setdefault(task.definition_id(),0)
                     working_count_by_id[task.definition_id()] += 1
-                    used_cpu_by_offer_id.setdefault(offer.id,0)
-                    used_cpu_by_offer_id[offer.id] += task.cpus()
-                    used_mem_by_offer_id.setdefault(offer.id,0)
-                    used_mem_by_offer_id[offer.id] += task.mem()
+                    used_cpu_by_offer_id.setdefault(offer.id.value,0)
+                    used_cpu_by_offer_id[offer.id.value] += task.cpus()
+                    used_mem_by_offer_id.setdefault(offer.id.value,0)
+                    used_mem_by_offer_id[offer.id.value] += task.mem()
                     this_run_host_queue_count.setdefault(offer.hostname)
                     this_run_host_queue_count[offer.hostname] += 1
 
         for offer_id in matched_tasks_by_offer_id:
             logging.info("Launching %d tasks on offer id %s" % (len(matched_tasks_by_offer_id[offer_id]),offer_id))
-            driver.launchTasks(offer_id, matched_tasks_by_offer_id[offer_id], filters)
+            driver.launchTasks({'value':offer_id}, matched_tasks_by_offer_id[offer_id], filters)
 
     def getResource(self, res, name):
         for r in res:
