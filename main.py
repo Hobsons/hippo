@@ -21,6 +21,8 @@ def reconcile(driver, redis_client):
         # give time for driver to connect first
         time.sleep(5)
         while True:
+            # delete any ancient tasks so that we don't have them clog things up forever
+            HippoTask.cleanup_old_tasks(redis_client)
             try:
                 running_task_ids = [dict(task_id={'value':t.mesos_id}) for t in HippoTask.working_tasks(redis_client)]
                 if running_task_ids:
@@ -101,9 +103,6 @@ def leader():
     # hippo queue will run a thread pool to monitor queues for work and create tasks
     process_queue_thread = HippoQueue.process_queues(redis_client)
     logging.info('Started queue processing thread')
-
-    # delete any ancient tasks so that we don't have them clog things up forever
-    HippoTask.cleanup_old_tasks(redis_client)
 
     while driver_thread.is_alive() and \
           reconcile_thread.is_alive() and \
