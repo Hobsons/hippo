@@ -65,14 +65,39 @@ class HippoTask(object):
     @classmethod
     def cleanup_old_tasks(cls, redis_client):
         tasks = cls.all_tasks(redis_client)
-        count = 0
+
+        deleted_count = 0
+        count_by_id = {}
+
+        # max life for completed tasks
         cutoff = time.time() - config.TASK_RETENTION_SECONDS
+        # max life for running tasks
+        cutoff_running = time.time() - (config.TASK_RETENTION_SECONDS * 3)
+
         for t in tasks:
             if 'status_tstamp' not in t.definition or \
+               t.definition['status_tstamp'] < cutoff_running or \
                (t.definition['status_tstamp'] < cutoff and t.definition.get('mesos_state','') in MESOS_FINAL_STATES):
                 t.delete()
-                count += 1
-        logging.info('Deleted %d old tasks' % count)
+                deleted_count += 1
+            else:
+                count_by_id.setdefault(t.definition_id(),[]).append(t)
+
+        for tid in count_by_id:
+            if len(count_by_id[tid]) > config.TASK_RETENTION_COUNT:
+                # sort by status_tstamp to put oldest first
+                count_by_id[tid].sort(key=lambda x: x.definition['status_tstamp'])
+                to_del_count = len(count_by_id[tid]) - config.TASK_RETENTION_COUNT
+                deleted_this_id_count = 0
+                # start deleting completed tasks, break if we hit a running task or count goes below limit
+                for t in count_by_id[tid]:
+                    if deleted_this_id_count >= to_del_count or t.definition.get('mesos_state','') not in MESOS_FINAL_STATES:
+                        break
+                    t.delete()
+                    deleted_this_id_count += 1
+                    deleted_count += 1
+
+        logging.info('Deleted %d old tasks' % deleted_count)
 
     @classmethod
     def kill_tasks(cls, redis_client):

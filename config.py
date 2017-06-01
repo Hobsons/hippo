@@ -16,7 +16,11 @@ MESOS_HOST = os.getenv('MESOS_HOST')
 
 NUM_QUEUE_POLL_WORKERS = int(os.getenv('NUM_QUEUE_POLL_WORKERS',8))
 
+# will keep completed tasks for a maximum of TASK_RETENTION_SECONDS
 TASK_RETENTION_SECONDS = int(os.getenv('TASK_RETENTION_SECONDS',86400))
+
+# will keep maximum of TASK_RETENTION_COUNT completed tasks for each id
+TASK_RETENTION_COUNT = int(os.getenv('TASK_RETENTION_COUNT',100))
 
 AES_CIPHER_KEY = os.getenv('AES_CIPHER_KEY','SOMECIPHER99993u3nfnnslfeiwjf3rjj3jsnefjnw3f')
 HASHED_KEY = hashlib.sha256(AES_CIPHER_KEY.encode()).digest()
