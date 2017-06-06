@@ -10,5 +10,5 @@ pymesos
 redis
 cronex
 pycrypto
-
+uwsgi
 
