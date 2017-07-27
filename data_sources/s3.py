@@ -25,11 +25,20 @@ class S3Bucket(HippoDataSource):
                           aws_secret_access_key = self.awssecret,
                           region_name = self.awsregion)
 
+        bname = self.bucket_name.split('/')[0]
+        bprefix = self.bucket_name.split('/')[1] if '/' in self.bucket_name else ''
+
         s3 = session.resource('s3')
-        bucket = s3.Bucket(self.bucket_name)
+        bucket = s3.Bucket(bname)
 
         key_tstamp_tuples = []
-        for key in bucket.objects.all():
+
+        if bprefix:
+            biterator = bucket.objects.filter(Prefix=bprefix)
+        else:
+            biterator = bucket.objects.all()
+
+        for key in biterator:
             tstamp = key.last_modified.timestamp()
             if not self.earliest_unix_tstamp or int(self.earliest_unix_tstamp) < tstamp:
                 key_tstamp_tuples.append((key.key,tstamp))

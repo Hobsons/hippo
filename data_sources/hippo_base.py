@@ -59,9 +59,11 @@ class HippoDataSource(object):
             del task_def['queue']
             task_def['max_concurrent'] = self.max_concurrent
             task_def['cmd'] = task_def['cmd'].replace('$HIPPO_DATA_BASE64',b64data).replace('$HIPPO_DATA',data)
-            if 'env' in task_def:
-                for env_name in task_def['env']:
-                    task_def['env'][env_name] = task_def['env'][env_name].replace('$HIPPO_DATA_BASE64',b64data).replace('$HIPPO_DATA',data)
+            task_def.setdefault('env',{})
+            for env_name in task_def['env']:
+                task_def['env'][env_name] = task_def['env'][env_name].replace('$HIPPO_DATA_BASE64',b64data).replace('$HIPPO_DATA',data)
+            task_def['env']['HIPPO_DATA'] = data
+            task_def['env']['HIPPO_DATA_BASE64'] = b64data
 
             task = self.task_class(definition=task_def, redis_client=self.hippo_redis)
             task.queue()

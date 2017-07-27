@@ -4,6 +4,15 @@ Mesos framework for eating tasks off queues and running them as docker container
 The two abstractions used are "Queues" and "Tasks".  Queues are definitions for things that generate tasks, and tasks are
 the records for the actual mesos tasks that were triggered.  One-off tasks can also be generated outside of a queue.
 
+For tasks created from queues, the queue data is made available to the task as both replacement and ENV variables.  Two
+ENV vars are set:
+1.  HIPPO_DATA - raw queue data
+2.  HIPPO_DATA_BASE64 - queue data base64 encoded
+
+Additionally, you can use $HIPPO_DATA and $HIPPO_DATA_BASE64 in your other env var values and cmd string and they will be
+replaced with the actual data at run time. See the queue types below for what types of data will be present, as this varies
+by queue type.  Note that for batched runs, the data in these variables will be separated by the batch separator.
+
 
 ## API
 
@@ -166,6 +175,7 @@ the records for the actual mesos tasks that were triggered.  One-off tasks can a
 
 - AWS SQS
   - namespace: sqs
+  - hippo_data type: body of sqs message
   - parameters:
     - awskey
     - awssecret
@@ -173,6 +183,7 @@ the records for the actual mesos tasks that were triggered.  One-off tasks can a
     - queuename
 - AWS S3
   - namespace: s3bucket
+  - hippo_data type: s3 keyname
   - parameters:
     - awskey
     - awssecret
@@ -181,6 +192,7 @@ the records for the actual mesos tasks that were triggered.  One-off tasks can a
     - earliest_unix_tstamp
 - Redis Queue
   - namespace: redis
+  - hippo_data type: body of redis queue message
   - parameters:
     - host
     - port
@@ -188,6 +200,7 @@ the records for the actual mesos tasks that were triggered.  One-off tasks can a
     - name
 - SQL Query
   - namespace: sqlquery
+  - hippo_data type: json encoded list of columns for each row
   - parameters:
     - conn_string
     - query
@@ -195,6 +208,7 @@ the records for the actual mesos tasks that were triggered.  One-off tasks can a
     - filter_val
 - Cron String
   - namespace: cron
+  - hippo_data type: unix timestamp
   - parameters:
     - cronstring
     - maxbacklog
