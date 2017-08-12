@@ -44,8 +44,9 @@ class S3Bucket(HippoDataSource):
                 key_tstamp_tuples.append((key.key,tstamp))
 
         if key_tstamp_tuples:
-            print('s3 triggers present',key_tstamp_tuples)
-            print('earliest unix timestamp',self.earliest_unix_tstamp)
+            logging.warning("s3 triggers present")
+            logging.warning(key_tstamp_tuples)
+            logging.warning('earliest unix timestamp ' + str(self.earliest_unix_tstamp))
             key_tstamp_tuples.sort(key=lambda x: x[1])
             key_tstamp_tuples = key_tstamp_tuples[:self.new_task_limit]
             self.create_tasks([kt[0] for kt in key_tstamp_tuples])
