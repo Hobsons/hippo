@@ -4,13 +4,13 @@ RUN apt-get update \
  && apt-get install -y libsasl2-dev python-dev libldap2-dev libssl-dev nginx git gcc supervisor \
  && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN curl -OLs http://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-2.1.5.tar.gz \
- && tar -xzf mysql-connector-python-2.1.5.tar.gz \
- && cd mysql-connector-python-2.1.5 \
+RUN curl -OLs https://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-2.1.7.tar.gz \
+ && tar -xzf mysql-connector-python-2.1.7.tar.gz \
+ && cd mysql-connector-python-2.1.7 \
  && python setup.py install \
  && cd .. \
- && rm -rf mysql-connector-python-2.1.5 \
- && rm mysql-connector-python-2.1.5.tar.gz
+ && rm -rf mysql-connector-python-2.1.7 \
+ && rm mysql-connector-python-2.1.7.tar.gz
 
 COPY . /app
 
