@@ -37,12 +37,20 @@ class HippoDataSource(object):
         pass
 
     def process_source(self):
+        # update last_run_tstamp before we process in case processing takes a few seconds
+        self.hippo_queue.definition['queue']['last_run_tstamp'] = int(time.time())
+        try:
+            self.hippo_queue.save()
+        except redis.exceptions.ConnectionError:
+            logging.warning('Redis Connection Error in Queue Worker Thread')
+
         try:
             self.process()
         except Exception as e:
             logging.warning('Error processing queue data source')
             logging.warning(e)
-        self.hippo_queue.definition['queue']['last_run_tstamp'] = int(time.time())
+
+        # save queue again in case the processing updated any variables
         try:
             self.hippo_queue.save()
         except redis.exceptions.ConnectionError:
