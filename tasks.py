@@ -175,6 +175,9 @@ class HippoTask(object):
 
     def kill(self):
         self.redis.lpush('hippo:kill_taskid_list',self.mesos_id)
+        self.definition['system_retries'] = 0
+        self.definition['task_retries'] = 0
+        self.save()
 
     def kill_complete(self):
         self.redis.lrem('hippo:kill_taskid_list',0,self.mesos_id)
