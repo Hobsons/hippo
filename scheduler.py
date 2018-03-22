@@ -9,6 +9,7 @@ class HippoScheduler(Scheduler):
     def __init__(self, redis_client):
         self.redis = redis_client
         self.host_recent_queue = {}
+        self.failovers = []
 
     def __log_recent_queue(self,host):
         self.host_recent_queue.setdefault(host,[]).append(time.time())
@@ -101,7 +102,15 @@ class HippoScheduler(Scheduler):
 
     def error(self, driver, message):
         logging.warning('MESOS Error: ' + message)
-        if message == 'Framework has been removed':
+        if 'Framework failed over' in message:
+            now_tstamp = time.time()
+            self.failovers.append(now_tstamp)
+            self.failovers = [t for t in self.failovers if t > now_tstamp - 600]
+            if len(self.failovers) > 10:
+                logging.warning('More than 10 framework failovers in last 10 minutes!  Clearing Saved Framework ID and Dying!')
+                self.redis.delete('hippo:saved_framework_id')
+                exit()
+        if 'Framework has been removed' in message:
             logging.warning('Clearing Saved Framework ID and Dying!')
             self.redis.delete('hippo:saved_framework_id')
             exit()
