@@ -43,15 +43,18 @@ class S3Bucket(HippoDataSource):
         for key in biterator:
             tstamp = key.last_modified.timestamp()
             if not last_s3key_processed_tstamp or int(last_s3key_processed_tstamp) < tstamp:
+                if key.key.endswith('/'):
+                    continue
                 key_tstamp_tuples.append((key.key,tstamp))
 
         if key_tstamp_tuples:
-            logging.warning("s3 triggers present")
+            logging.warning("s3 triggers present " + str(self.hippo_queue['id']))
             logging.warning(key_tstamp_tuples)
             logging.warning('latest_s3key_processed_tstamp ' + str(last_s3key_processed_tstamp))
             key_tstamp_tuples.sort(key=lambda x: x[1])
             key_tstamp_tuples = key_tstamp_tuples[:self.new_task_limit]
             self.create_tasks([kt[0] for kt in key_tstamp_tuples])
             last_processed_tstamp = key_tstamp_tuples[-1][1]
+            logging.warning('new latest_s3key_processed_tstamp ' + str(last_processed_tstamp))
             self.hippo_queue.definition['queue']['last_s3key_processed_tstamp'] = last_processed_tstamp
 
