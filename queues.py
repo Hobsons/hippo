@@ -20,6 +20,7 @@ class HippoQueue(object):
         self.id = id
         self.definition = definition
         self.redis = redis_client
+        self.loaded_queue_config = None
         if id is None:
             self.id = self.definition.get('id','')
             if not self.id:
