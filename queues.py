@@ -38,6 +38,8 @@ class HippoQueue(object):
         elif definition is None:
             self.load()
 
+        self.loaded_queue_config = copy.copy(self.definition.get('queue',{}))
+
     @classmethod
     def queues_from_ids(cls, queue_ids, redis_client):
         if not queue_ids:
@@ -129,6 +131,11 @@ class HippoQueue(object):
                 break
 
     def save(self):
+        if self.loaded_queue_config:
+            # check for timestamps that are local to the queue that should be saved even if definition was updated
+            for k in self.loaded_queue_config:
+                if k.startswith('last_') and k not in self.definition['queue']:
+                    self.definition['queue'][k] = self.loaded_queue_config[k]
         self.redis.set('hippo:queue:' + self.id,encrypt_str(json.dumps(self.definition)))
 
     def load(self):

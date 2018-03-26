@@ -95,7 +95,7 @@ def single_queue(queue_id):
 
 
 @app.route('/queues/<queue_id>/<toggle>/',methods=['GET'])
-def single_queue_enabgle_toggle(queue_id, toggle):
+def single_queue_enable_toggle(queue_id, toggle):
     q = HippoQueue(id=queue_id,redis_client=app.redis)
     if not q.definition:
         return jsonify({"error":queue_id + " not found"}), 404
