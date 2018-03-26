@@ -48,7 +48,7 @@ class S3Bucket(HippoDataSource):
                 key_tstamp_tuples.append((key.key,tstamp))
 
         if key_tstamp_tuples:
-            logging.warning("s3 triggers present " + str(self.hippo_queue['id']))
+            logging.warning("s3 triggers present " + str(self.hippo_queue.id))
             logging.warning(key_tstamp_tuples)
             logging.warning('latest_s3key_processed_tstamp ' + str(last_s3key_processed_tstamp))
             key_tstamp_tuples.sort(key=lambda x: x[1])
