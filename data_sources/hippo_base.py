@@ -56,6 +56,21 @@ class HippoDataSource(object):
         except redis.exceptions.ConnectionError:
             logging.warning('Redis Connection Error in Queue Worker Thread')
 
+    def create_task_tuples(self, item_tuples):
+        # tuples are str and timestamp pairs.  Combined they form a unique key for a processing item,
+        # and this function will prevent duplicate processings within a 24 hour window
+        ok_items = []
+        for item, tstamp in item_tuples:
+            key = 'hippo:tasktuple:' + base64.b64encode(item.encode()).decode().replace('=','') + '_' + str(tstamp)
+            val = self.hippo_redis.get(key)
+            if val:
+                logging.warning('Skipping task creation because ' + item + ' ' + str(tstamp) + ' has already been processed')
+            else:
+                ok_items.append(item)
+                self.hippo_redis.set(key,'processed',ex=86400)
+        if ok_items:
+            self.create_tasks(ok_items)
+
     def create_tasks(self, items):
         if items:
             self.hippo_queue.definition['queue']['last_task_queued_tstamp'] = int(time.time())

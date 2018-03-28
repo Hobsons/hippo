@@ -53,7 +53,7 @@ class S3Bucket(HippoDataSource):
             logging.warning('latest_s3key_processed_tstamp ' + str(last_s3key_processed_tstamp))
             key_tstamp_tuples.sort(key=lambda x: x[1])
             key_tstamp_tuples = key_tstamp_tuples[:self.new_task_limit]
-            self.create_tasks([kt[0] for kt in key_tstamp_tuples])
+            self.create_task_tuples(key_tstamp_tuples)
             last_processed_tstamp = key_tstamp_tuples[-1][1]
             logging.warning('new latest_s3key_processed_tstamp ' + str(last_processed_tstamp))
             self.hippo_queue.definition['queue']['last_s3key_processed_tstamp'] = last_processed_tstamp
