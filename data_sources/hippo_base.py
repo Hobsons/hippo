@@ -61,7 +61,7 @@ class HippoDataSource(object):
         # and this function will prevent duplicate processings within a 24 hour window
         ok_items = []
         for item, tstamp in item_tuples:
-            key = 'hippo:tasktuple:' + base64.b64encode(item.encode()).decode().replace('=','') + '_' + str(tstamp)
+            key = 'hippo:tasktuple:' + str(self.hippo_queue.id) + '_' + base64.b64encode(item.encode()).decode().replace('=','') + '_' + str(tstamp)
             val = self.hippo_redis.get(key)
             if val:
                 logging.warning('Skipping task creation because ' + item + ' ' + str(tstamp) + ' has already been processed')
