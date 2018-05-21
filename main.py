@@ -142,14 +142,13 @@ if __name__ == '__main__':
             from kazoo.protocol.states import KazooState
             logging.info('zkstate '+ str(state))
             global leader_election
-            if state in [KazooState.SUSPENDED, KazooState.LOST]:
+            if str(state) in [KazooState.SUSPENDED, KazooState.LOST]:
                 if leader_election is not None and not leader_election.lock.is_acquired:
-                    logging.info('lost zk connection while waiting to be leader, exiting')
                     leader_election.cancel()
-                else:
-                    # we are the leader
-                    exit()
-
+                logging.info('lost zk connection, exiting...')
+                exit(0)
+            else:
+                logging.info('zk connection OK')
 
         zk.add_listener(zk_listen)
         zk.start()
