@@ -12,10 +12,11 @@ RUN curl -OLs https://dev.mysql.com/get/Downloads/Connector-Python/mysql-connect
  && rm -rf mysql-connector-python-2.1.7 \
  && rm mysql-connector-python-2.1.7.tar.gz
 
-COPY . /app
-
 WORKDIR /app
+COPY requirements.txt ./
 RUN pip install -r requirements.txt
+
+COPY . /app
 
 ENV FLASK_APP=api.py
 
