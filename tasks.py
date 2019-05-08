@@ -147,7 +147,7 @@ class HippoTask(object):
 
     def queue(self):
         self.redis.lpush('hippo:waiting_taskid_list',self.mesos_id)
-        self.redis.zadd('hippo:all_taskid_list',int(time.time()),self.mesos_id)
+        self.redis.zadd('hippo:all_taskid_list',{self.mesos_id: int(time.time())})
 
     def work(self):
         pipe = self.redis.pipeline()
