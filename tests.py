@@ -74,6 +74,8 @@ class TestTask(unittest.TestCase):
         offer.agent_id.value = '999'
         ld = x.mesos_launch_definition(offer)
         self.assertEqual(ld['agent_id'], {'value': '999'})
+        self.assertTrue(hasattr(ld.command.environment, 'variables'))
+        self.assertTrue({'name': 'HIPPO_TASK_NAME', 'value': 'fooface'} in ld.command.environment.variables)
 
     def test_constraints_ok(self):
         x = HippoTask(definition={'id':'foo'},redis_client=self.redis_client)
