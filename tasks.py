@@ -147,7 +147,7 @@ class HippoTask(object):
 
     def queue(self):
         self.redis.lpush('hippo:waiting_taskid_list',self.mesos_id)
-        self.redis.zadd('hippo:all_taskid_list',int(time.time()),self.mesos_id)
+        self.redis.zadd('hippo:all_taskid_list',{self.mesos_id: int(time.time())})
 
     def work(self):
         pipe = self.redis.pipeline()
@@ -221,8 +221,9 @@ class HippoTask(object):
         d.agent_id.value = offer.agent_id.value
         d.name = self.definition_id()
         d.command.value = self.definition['cmd']
+        d.command.environment.variables = [dict(name='HIPPO_TASK_NAME', value=self.definition['id'])]
         if self.definition.get('env'):
-            d.command.environment.variables = [
+            d.command.environment.variables += [
                 dict(name=e[0],value=e[1]) for e in self.definition['env'].items()
             ]
         d.container.type='DOCKER'

@@ -1,4 +1,4 @@
-FROM python:3
+FROM python:3.5
 
 RUN apt-get update \
  && apt-get install -y libsasl2-dev python-dev libldap2-dev libssl-dev nginx git gcc supervisor \
@@ -12,10 +12,11 @@ RUN curl -OLs https://dev.mysql.com/get/Downloads/Connector-Python/mysql-connect
  && rm -rf mysql-connector-python-2.1.7 \
  && rm mysql-connector-python-2.1.7.tar.gz
 
-COPY . /app
-
 WORKDIR /app
+COPY requirements.txt ./
 RUN pip install -r requirements.txt
+
+COPY . /app
 
 ENV FLASK_APP=api.py
 
