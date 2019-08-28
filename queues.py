@@ -175,6 +175,7 @@ class HippoQueue(object):
         processors = HippoDataSource.__subclasses__()
         for p in processors:
             if p.namespace.upper() == ns.upper() and getattr(p,'inputs',None):
+                print('VALIDATOR - MATCHED SCHEMA', p.namespace)
                 ns_schema = {}
                 for input_name in p.inputs:
                     itype = "string" if p.inputs[input_name]['input'] in ['text','password'] else 'integer'
@@ -190,6 +191,8 @@ class HippoQueue(object):
                     "required":True,
                     "schema":ns_schema
                 }
+        print('VALIDATOR - SCHEMA', s)
+        print('VALIDATOR - DEFINITION', self.definition)
         v = Validator(s, allow_unknown=True)
         valid = v.validate(self.definition)
         if valid:
