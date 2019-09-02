@@ -24,7 +24,7 @@ def tasks():
 
         existing = [t for t in tasks if (
             t.definition['cmd'] == data['cmd'] and
-            t.definition['mesos_state'] in ['TASK_RUNNING', 'WAITING_ON_OFFERS'] and
+            t.definition['mesos_state'] in ['TASK_STAGING','TASK_RUNNING', 'WAITING_ON_OFFERS'] and
             t.definition['container']['docker']['image'] == data['container']['docker']['image'])
         ]
 
