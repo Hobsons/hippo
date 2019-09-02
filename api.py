@@ -18,8 +18,20 @@ def index():
 
 @app.route('/tasks/',methods=['GET','POST'])
 def tasks():
+    tasks = HippoTask.all_tasks(redis_client=app.redis)
     if request.method == 'POST':
         data = request.get_json()
+
+        existing = [t for t in tasks if (
+            t.definition['cmd'] == data['cmd'] and
+            t.definition['mesos_state'] in ['TASK_RUNNING', 'WAITING_ON_OFFERS'] and
+            t.definition['container']['docker']['image'] == data['container']['docker']['image'])
+        ]
+
+        if len(existing):
+            print('skipping duplicate task', data)
+            return jsonify({"mesos_id":existing[0].mesos_id})
+
         # create a new task
         t = HippoTask(definition=data,redis_client=app.redis)
         validation_error = t.validate()
@@ -27,8 +39,6 @@ def tasks():
             return jsonify({"error":validation_error}), 400
         t.queue()
         return jsonify({"mesos_id":t.mesos_id})
-    else:
-        tasks = HippoTask.all_tasks(redis_client=app.redis)
 
     return jsonify([t.definition for t in tasks])
 
