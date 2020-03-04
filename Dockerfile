@@ -1,7 +1,7 @@
 FROM python:3.5
 
 RUN apt-get update \
- && apt-get install -y libsasl2-dev python-dev libldap2-dev libssl-dev nginx git gcc supervisor \
+ && apt-get install -y libsasl2-dev python-dev libldap2-dev libssl-dev nginx git gcc supervisor libzookeeper-mt-dev \
  && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN curl -OLs https://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-2.1.7.tar.gz \
